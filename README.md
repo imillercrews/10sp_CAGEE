@@ -1,2 +1,2 @@
 # 10sp_CAGEE
-Scripts related to manuscript on transcriptome evolution in songbird brains across sex
+R code and bash scripts related to all figures and analyses in manuscript on transcriptome evolution in songbird brains across sex.
