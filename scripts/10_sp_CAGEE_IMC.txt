@@ -1,0 +1,912 @@
+#### 10 species bird CAGEE analysis
+### Run CAGEE with normalized read counts from CGB
+## Run on Quartz: /geode2/home/u040/imillerc/Quartz/10_sp/CAGEE/ 
+
+## quartz specific commands
+# start interactive session
+#srun -p general -A r00712 --time=01:00:00 --pty bash
+
+
+### data 
+## Use file generated from: 10_sp_CAGEE_IMC.R
+# normalizedCounts_ratio.tsv
+# normalizedCounts_median_sex.tsv
+
+## Newick file generated from timetree
+# 10_species_birds_edit.nwk
+
+
+## load dependencies 
+# cmake
+#cmake --version
+# version 3.26.5 installed
+
+#boost 
+# check if it is installed
+module load boost
+# version 1.75.0 installed
+
+# Eigen
+module load eigen
+# version 3.4.0 installed
+
+# MKL
+module load intel
+
+#### install CAGEE
+## get to correct directory
+cd 10_sp/CAGEE/
+
+## download file
+git clone https://github.com/hahnlab/CAGEE.git
+#wget https://github.com/hahnlab/CAGEE/releases/download/1.1.1/CAGEE1.1.1.tar.gz
+#tar xzvf CAGEE1.1.1.tar.gz
+
+## Build CAGEE
+cd CAGEE
+mkdir build
+cd build/
+cmake ..
+make -j 4
+#make install
+## error with cmake when trying make install get permission denied error
+
+#### run CAGEE
+### use Male to Female multi tissue
+## /N/u/imillerc/Quartz/10_sp/CAGEE
+./CAGEE/build/cagee --tree 10_species_birds_edit.nwk --infile normalizedCounts_median_sex.tsv --output_prefix median/median_cagee_outs_2 --sample_group M --sample_group F
+# run in interactive session
+# took 40 minutes to run 
+
+## compare to single sigma
+./CAGEE/build/cagee --tree 10_species_birds_edit.nwk --infile normalizedCounts_median_sex.tsv --output_prefix median/median_cagee_outs_all --cores 64
+# run in interactive session
+
+### Cavity nesting median
+## /N/u/imillerc/Quartz/10_sp/CAGEE
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix median_cavity/median_cavity_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --cores 32
+
+## run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix median_cavity/median_cavity_2p_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --cores 32
+
+## combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix median_cavity/median_cavity_facultative_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --cores 32
+
+## cavity nesting 1p median
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix median_cavity/median_cavity_1p_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --cores 32
+
+## cavity nesting 4p median
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix median_cavity/median_cavity_4p_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_4p.nwk --cores 64
+
+
+### Cavity nesting median across sex
+## /N/u/imillerc/Quartz/10_sp/CAGEE
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix median_cavity/sex/median_cavity_sex_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --sample_group M --sample_group F
+# 7 minutes on interactive node
+
+## run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix median_cavity/sex/median_cavity_2p_sex_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --sample_group M --sample_group F
+
+## combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix median_cavity/sex/median_cavity_facultative_sex_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --sample_group M --sample_group F
+
+## cavity nesting 1p median
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix median_cavity/sex/median_cavity_1p_sex_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --sample_group M --sample_group F
+
+### Cavity nesting median across sex seperately 
+## males 
+# /N/u/imillerc/Quartz/10_sp/CAGEE
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix median_cavity/sex/median_cavity_sex_M_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --sample_group M
+# 7 minutes on interactive node
+
+# run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix median_cavity/sex/median_cavity_2p_sex_M_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --sample_group M
+
+# combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix median_cavity/sex/median_cavity_facultative_sex_M_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --sample_group M
+
+# cavity nesting 1p median
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix median_cavity/sex/median_cavity_1p_sex_M_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --sample_group M
+
+## females 
+# /N/u/imillerc/Quartz/10_sp/CAGEE
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix median_cavity/sex/median_cavity_sex_F_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --sample_group F
+# 7 minutes on interactive node
+
+# run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix median_cavity/sex/median_cavity_2p_sex_F_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --sample_group F
+
+# combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix median_cavity/sex/median_cavity_facultative_sex_F_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --sample_group F
+
+# cavity nesting 1p median
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix median_cavity/sex/median_cavity_1p_sex_F_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --sample_group F
+
+### Cavity nesting median across Z
+## /N/u/imillerc/Quartz/10_sp/CAGEE
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_cavity/Z/median_cavity_Z_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --sample_group Z --sample_group A
+# 7 minutes on interactive node
+
+## run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_cavity/Z/median_cavity_2p_Z_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --sample_group Z --sample_group A
+
+## combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_cavity/Z/median_cavity_facultative_Z_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --sample_group Z --sample_group A
+
+## cavity nesting 1p median
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_cavity/Z/median_cavity_1p_Z_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --sample_group Z --sample_group A
+
+### Cavity nesting median across Z run seperately
+## Z
+# /N/u/imillerc/Quartz/10_sp/CAGEE
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_cavity/Z/median_cavity_Z_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --sample_group Z
+
+# run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_cavity/Z/median_cavity_2p_Z_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --sample_group Z
+
+# combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_cavity/Z/median_cavity_facultative_Z_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --sample_group Z
+
+# cavity nesting 1p median
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_cavity/Z/median_cavity_1p_Z_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --sample_group Z 
+
+## A
+# /N/u/imillerc/Quartz/10_sp/CAGEE
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_cavity/Z/median_cavity_A_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --sample_group A
+
+# run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_cavity/Z/median_cavity_2p_A_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --sample_group A
+
+# combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_cavity/Z/median_cavity_facultative_A_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --sample_group A
+
+# cavity nesting 1p median
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_cavity/Z/median_cavity_1p_A_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --sample_group A
+
+
+### Cavity nesting median across Z and sex run seperately
+## Z and males
+# /N/u/imillerc/Quartz/10_sp/CAGEE
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_Z_male_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --sample_group MZ
+
+# run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_2p_Z_male_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --sample_group MZ
+
+# combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_facultative_Z_male_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --sample_group MZ
+
+# cavity nesting 1p median
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_1p_Z_male_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --sample_group MZ 
+
+## Z and females
+# /N/u/imillerc/Quartz/10_sp/CAGEE
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_Z_female_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --sample_group FZ
+
+# run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_2p_Z_female_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --sample_group FZ
+
+# combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_facultative_Z_female_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --sample_group FZ
+
+# cavity nesting 1p median
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_1p_Z_female_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --sample_group FZ 
+
+## A and males
+# /N/u/imillerc/Quartz/10_sp/CAGEE
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_A_male_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --sample_group MA
+
+# run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_2p_A_male_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --sample_group MA
+
+# combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_facultative_A_male_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --sample_group MA
+
+# cavity nesting 1p median
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_1p_A_male_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --sample_group MA
+
+## Z and females
+# /N/u/imillerc/Quartz/10_sp/CAGEE
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_A_female_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --sample_group FA
+
+# run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_2p_A_female_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --sample_group FA
+
+# combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_facultative_A_female_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --sample_group FA
+
+# cavity nesting 1p median
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_cavity/sex_z/median_cavity_1p_A_female_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --sample_group FA
+
+### use Male to Female ratio
+## run again with new git pull
+git pull https://github.com/hahnlab/CAGEE.git
+## /N/u/imillerc/Quartz/10_sp/CAGEE
+## fixed tree so that it is ultrametric
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix ratio/ratio_cagee_outs --ratio --cores 4
+# took 8 minutes to run on login node
+
+
+### Z chromosome gene evolution
+## run with median 
+## two tissue approach with genes on Z chromosome vs autosome genes
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_z/median_z_cagee_outs --sample_group Z --sample_group A --cores 8
+# 3 hours with single core (1 node with 1 task per node...)
+
+## compare Z between sexes
+## run with median 
+## two tissue approach with genes on Z chromosome in males vs females
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_z/median_z_sex_cagee_outs --sample_group MZ --sample_group FZ --cores 64
+# create slurm file
+
+## compare A between sexes
+## run with median 
+## two tissue approach with genes on Z chromosome in males vs females
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_z/median_a_sex_cagee_outs --sample_group MA --sample_group FA --cores 128
+# create slurm file
+# 10 minutes
+
+## compare A between sexes
+## run with median 
+## two tissue approach with genes on A chromosome in males vs females
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_z/median_a_sex_cagee_outs --sample_group MA --sample_group FA --cores 128
+# create slurm file
+# 10 minutes
+
+## all genes
+## run with median 
+## two tissue approach with all genes
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_z/median_all_cagee_outs --cores 32
+
+## compare male vs female
+## run with median 
+## two tissue approach with male vs female
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_z/median_all_sex_cagee_outs --sample_group MA,MZ --sample_group FA,FZ --cores 32
+
+## compare A vs Z
+## run with median 
+## two tissue approach with A vs Z
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_z/median_az_sex_cagee_outs --sample_group MA,FA --sample_group MZ,FZ --cores 32
+
+## compare MZ vs FZ
+## run with median 
+## two tissue approach with MZ vs FZ vs MA+FA
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_z/median_az_sex_cagee_outs --sample_group MA,FA --sample_group MZ --sample_group FZ --cores 32
+
+## compare MA vs FA vs Z
+## run with median 
+## two tissue approach with MA vs FA vs Z
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_z/median_a_sex_all_cagee_outs --sample_group MA --sample_group FA --sample_group MZ,FZ --cores 32
+
+## compare MZ vs FZ vs MA vs FA
+## run with median 
+## two tissue approach with MZ vs FZ vs MA VSFA
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex_z.tsv --output_prefix median_z/median_az_sex_all_cagee_outs --sample_group MA --sample_group FA --sample_group MZ --sample_group FZ --cores 32
+
+
+
+## run with ratio 
+## two tissue approach with genes on Z chromosome vs autosome genes
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/ratio_all_cagee_outs --ratio --cores 64
+
+## run with ratio 
+## two tissue approach with genes on Z chromosome vs autosome genes
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/ratio_z_cagee_outs --ratio --sample_group Z --sample_group A --cores 64
+# 1 minute
+
+
+
+### compare ratio quantiles
+## z chromosome
+## multi tissue approach with genes on Z chromosome for quantiles in tree swallow
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/ratio_z_quantile_ts_cagee_outs --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5 --cores 64
+
+# centered z chromosome
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts_sim_center.tsv --output_prefix ratio/ratio_z_sim_center_quantile_ts_cagee_outs --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5 --cores 64
+
+# centered and scaled z chromosome
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts_sim_scale.tsv --output_prefix ratio/ratio_z_sim_scale_quantile_ts_cagee_outs --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5 --cores 32
+
+# z chromosome gametologs removed
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts_sim_game.tsv --output_prefix ratio/ratio_z_sim_game_quantile_ts_cagee_outs --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5
+
+# z chromosome gametologs removed and centered
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts_sim_center_game.tsv --output_prefix ratio/ratio_z_sim_center_game_quantile_ts_cagee_outs --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5
+
+## 4 chromosome
+## multi tissue approach with genes on an autosome of similar size to Z chromosome for quantiles in tree swallow
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/ratio_4_quantile_ts_cagee_outs --ratio --sample_group 4.1 --sample_group 4.2 --sample_group 4.3 --sample_group 4.4 --sample_group 4.5 --cores 64
+
+## 7 chromosome
+## multi tissue approach with genes on an autosome of similar size to Z chromosome for quantiles in tree swallow
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/ratio_7_quantile_ts_cagee_outs --ratio --sample_group 7.1 --sample_group 7.2 --sample_group 7.3 --sample_group 7.4 --sample_group 7.5 --cores 64
+
+## z chromosome simulation
+## multi tissue approach with genes on Z chromosome for quantiles in tree swallow
+# uniform
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts_sim.tsv --output_prefix ratio/ratio_z_sim_quantile_ts_cagee_outs --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5 --cores 64
+
+# normal
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts_sim.norm.tsv --output_prefix ratio/ratio_z_sim_norm_quantile_ts_cagee_outs --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5 --cores 64
+
+## z chromosome simulation
+## shifted towards bias
+## multi tissue approach with genes on Z chromosome for quantiles in tree swallow
+# uniform
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts_sim_0.5.tsv --output_prefix ratio/ratio_z_sim_0.5_quantile_ts_cagee_outs --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5 --cores 64
+
+# normal
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts_sim_0.5.norm.tsv --output_prefix ratio/ratio_z_sim_norm_0.5_quantile_ts_cagee_outs --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5 --cores 64
+
+## 4 chromosome
+# shifted towards male bias
+## multi tissue approach with genes on an autosome of similar size to Z chromosome for quantiles in tree swallow
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts_shifted.tsv --output_prefix ratio/ratio_4_quantile_shifted_ts_cagee_outs --ratio --sample_group 4.1 --sample_group 4.2 --sample_group 4.3 --sample_group 4.4 --sample_group 4.5 --cores 32
+
+## 7 chromosome
+# shifted towards male bias
+## multi tissue approach with genes on an autosome of similar size to Z chromosome for quantiles in tree swallow
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts_shifted.tsv --output_prefix ratio/ratio_7_quantile_shifted_ts_cagee_outs --ratio --sample_group 7.1 --sample_group 7.2 --sample_group 7.3 --sample_group 7.4 --sample_group 7.5 --cores 32
+
+
+### Cavity nesting ratio
+## /N/u/imillerc/Quartz/10_sp/CAGEE
+## compare overall ratio
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix ratio/ratio_cagee_outs --ratio --cores 32
+
+## compare cavity nesting
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix ratio/ratio_cavity_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --ratio --cores 32
+
+## run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix ratio/ratio_cavity_2p_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --ratio --cores 32
+
+## combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix ratio/ratio_cavity_facultative_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --ratio --cores 32
+
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix ratio/ratio_cavity_2p_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --ratio --cores 32
+
+## cavity nesting 4p 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix ratio/ratio_cavity_4p_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_4p.nwk --ratio --cores 32
+
+### Cavity nesting ratio across Z
+## /N/u/imillerc/Quartz/10_sp/CAGEE
+## compare cavity nesting
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_z_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --ratio --sample_group Z --sample_group A
+
+## run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_2p_z_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --ratio --sample_group Z --sample_group A
+
+## combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_facultative_z_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --ratio --sample_group Z --sample_group A
+
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_2p_z_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --ratio --sample_group Z --sample_group A
+
+## cavity nesting 1p 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_1p_z_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --ratio --sample_group Z --sample_group A
+
+### Cavity nesting ratio across Z seperately
+## Z
+# /N/u/imillerc/Quartz/10_sp/CAGEE
+# compare cavity nesting
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_z_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --ratio --sample_group Z
+
+# run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_2p_z_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --ratio --sample_group Z
+
+# combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_facultative_z_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --ratio --sample_group Z
+
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_2p_z_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --ratio --sample_group Z
+
+# cavity nesting 1p 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_1p_z_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --ratio --sample_group Z
+
+## A
+# /N/u/imillerc/Quartz/10_sp/CAGEE
+# compare cavity nesting
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_A_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --ratio --sample_group A
+
+# run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_2p_A_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --ratio --sample_group A
+
+# combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_facultative_A_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --ratio --sample_group A
+
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_2p_A_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --ratio --sample_group A
+
+# cavity nesting 1p 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/Z/ratio_cavity_1p_A_only_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --ratio --sample_group A
+
+## random 400 autosomal
+# /N/u/imillerc/Quartz/10_sp/CAGEE
+# compare cavity nesting
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z_rand.tsv --output_prefix ratio/Z/ratio_cavity_random_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity.nwk --ratio --sample_group 1
+
+# run with 2 sigma (internal and external branch)
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z_rand.tsv --output_prefix ratio/Z/ratio_cavity_2p_random_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --ratio --sample_group 1
+
+# combine all cavity nestings and facultative
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z_rand.tsv --output_prefix ratio/Z/ratio_cavity_facultative_random_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_facultative.nwk --ratio --sample_group 1
+
+# as comparison with cavity vs non-cavity vs internal branch 3 sigma above
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z_rand.tsv --output_prefix ratio/Z/ratio_cavity_2p_random_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk --ratio --sample_group 1
+
+# cavity nesting 1p 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z_rand.tsv --output_prefix ratio/Z/ratio_cavity_1p_random_cagee_outs --sigma_tree ./data/10_species_birds_edit_cavity_1p.nwk --ratio --sample_group 1
+
+
+
+
+### Evolution Z chromsome simulation
+## CAGEE simulation with random root values and fixed sigma 0.00038
+
+## uniform distribution
+# no bias
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --rootdist file:./data/sim/normalizedCounts_ratio_sim_ts_root.tsv --output_prefix sim/evo/ratio_z_sim_ts_cagee_outs --ratio --cores 8 --fixed_sigma 0.00038 --simulate 404
+
+## uniform distribution
+# male bias
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --rootdist file:./data/sim/normalizedCounts_ratio_sim_ts_root_0.5.tsv --output_prefix sim/evo/ratio_z_sim_0.5_ts_cagee_outs --ratio --cores 8 --fixed_sigma 0.00038 --simulate 404
+
+## normal distribution
+# no bias
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --rootdist file:./data/sim/normalizedCounts_ratio_sim_ts_root_norm.tsv --output_prefix sim/evo/ratio_z_sim_norm_ts_cagee_outs --ratio --cores 8 --fixed_sigma 0.00038 --simulate 404
+
+## uniform distribution
+# male bias
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --rootdist file:./data/sim/normalizedCounts_ratio_sim_ts_root_norm_0.5.tsv --output_prefix sim/evo/ratio_z_sim_norm_0.5_ts_cagee_outs --ratio --cores 8 --fixed_sigma 0.00038 --simulate 404
+
+### z chromosome quantile simulation
+### multi tissue approach with genes on Z chromosome evolved simulation and quantiles in tree swallow
+# uniform, no bias
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts_sim_evo.tsv --output_prefix sim/ratio/ratio_z_sim_evo_quantile_ts_cagee_outs --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5 --cores 64
+# ran in 2 minutes
+
+# uniform, male bias
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts_sim_0.5_evo.tsv --output_prefix sim/ratio/ratio_z_sim_evo_0.5_quantile_ts_cagee_outs --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5 --cores 64
+
+# normal, no bias
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts_sim_norm_evo.tsv --output_prefix sim/ratio/ratio_z_sim_norm_evo_quantile_ts_cagee_outs --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5 --cores 64
+
+# normal, male bias
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts_sim_norm_0.5_evo.tsv --output_prefix sim/ratio/ratio_z_sim_evo_norm_0.5_quantile_ts_cagee_outs --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5 --cores 64
+
+### quantile calculation all autosomes 
+## multi tissue approach with genes on an autosome for quantiles in tree swallow
+#  [1] "30" "29" "22" "24" "25" "27" "26" "21" "23" "28" "19" "17" "18" "20" "4A" 
+# [16] "13" "11" "12" "15" "14" "10" "9"  "8"  "6"  "7"  "Z"  "4"  "1A" "5"  "1" 
+# [31] "3"  "2"  "A" 
+# A
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_A_quantile_ts_cagee_outs --ratio --sample_group A.1 --sample_group A.2 --sample_group A.3 --sample_group A.4 --sample_group A.5 --cores 32
+# 2
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_2_quantile_ts_cagee_outs --ratio --sample_group 2.1 --sample_group 2.2 --sample_group 2.3 --sample_group 2.4 --sample_group 2.5 --cores 32
+# 3
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_3_quantile_ts_cagee_outs --ratio --sample_group 3.1 --sample_group 3.2 --sample_group 3.3 --sample_group 3.4 --sample_group 3.5 --cores 32
+# 1
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_1_quantile_ts_cagee_outs --ratio --sample_group 1.1 --sample_group 1.2 --sample_group 1.3 --sample_group 1.4 --sample_group 1.5 --cores 32
+# 5
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_5_quantile_ts_cagee_outs --ratio --sample_group 5.1 --sample_group 5.2 --sample_group 5.3 --sample_group 5.4 --sample_group 5.5 --cores 32
+# 1A
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_1A_quantile_ts_cagee_outs --ratio --sample_group 1A.1 --sample_group 1A.2 --sample_group 1A.3 --sample_group 1A.4 --sample_group 1A.5 --cores 32
+# 4
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_4_quantile_ts_cagee_outs --ratio --sample_group 4.1 --sample_group 4.2 --sample_group 4.3 --sample_group 4.4 --sample_group 4.5 --cores 32
+# Z
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_Z_quantile_ts_cagee_outs --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5 --cores 32
+# 7
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_7_quantile_ts_cagee_outs --ratio --sample_group 7.1 --sample_group 7.2 --sample_group 7.3 --sample_group 7.4 --sample_group 7.5 --cores 32
+# 6
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_6_quantile_ts_cagee_outs --ratio --sample_group 6.1 --sample_group 6.2 --sample_group 6.3 --sample_group 6.4 --sample_group 6.5 --cores 32
+# 8
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_8_quantile_ts_cagee_outs --ratio --sample_group 8.1 --sample_group 8.2 --sample_group 8.3 --sample_group 8.4 --sample_group 8.5 --cores 32
+# 9
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_9_quantile_ts_cagee_outs --ratio --sample_group 9.1 --sample_group 9.2 --sample_group 9.3 --sample_group 9.4 --sample_group 9.5 --cores 32
+# 10
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_10_quantile_ts_cagee_outs --ratio --sample_group 10.1 --sample_group 10.2 --sample_group 10.3 --sample_group 10.4 --sample_group 10.5 --cores 32
+# 14
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_14_quantile_ts_cagee_outs --ratio --sample_group 14.1 --sample_group 14.2 --sample_group 14.3 --sample_group 14.4 --sample_group 14.5 --cores 32
+# 15
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_15_quantile_ts_cagee_outs --ratio --sample_group 15.1 --sample_group 15.2 --sample_group 15.3 --sample_group 15.4 --sample_group 15.5 --cores 32
+# 12
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_12_quantile_ts_cagee_outs --ratio --sample_group 12.1 --sample_group 12.2 --sample_group 12.3 --sample_group 12.4 --sample_group 12.5 --cores 32
+# 11
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_11_quantile_ts_cagee_outs --ratio --sample_group 11.1 --sample_group 11.2 --sample_group 11.3 --sample_group 11.4 --sample_group 11.5 --cores 32
+# 13
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_13_quantile_ts_cagee_outs --ratio --sample_group 13.1 --sample_group 13.2 --sample_group 13.3 --sample_group 13.4 --sample_group 13.5 --cores 32
+# 4A
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_4A_quantile_ts_cagee_outs --ratio --sample_group 4A.1 --sample_group 4A.2 --sample_group 4A.3 --sample_group 4A.4 --sample_group 4A.5 --cores 32
+# 20
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_20_quantile_ts_cagee_outs --ratio --sample_group 20.1 --sample_group 20.2 --sample_group 20.3 --sample_group 20.4 --sample_group 20.5 --cores 32
+# 18
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_18_quantile_ts_cagee_outs --ratio --sample_group 18.1 --sample_group 18.2 --sample_group 18.3 --sample_group 18.4 --sample_group 18.5 --cores 32
+# 17
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_17_quantile_ts_cagee_outs --ratio --sample_group 17.1 --sample_group 17.2 --sample_group 17.3 --sample_group 17.4 --sample_group 17.5 --cores 32
+# 19
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_19_quantile_ts_cagee_outs --ratio --sample_group 19.1 --sample_group 19.2 --sample_group 19.3 --sample_group 19.4 --sample_group 19.5 --cores 32
+# 28
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_28_quantile_ts_cagee_outs --ratio --sample_group 28.1 --sample_group 28.2 --sample_group 28.3 --sample_group 28.4 --sample_group 28.5 --cores 32
+# 23
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_23_quantile_ts_cagee_outs --ratio --sample_group 23.1 --sample_group 23.2 --sample_group 23.3 --sample_group 23.4 --sample_group 23.5 --cores 32
+# 21
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_21_quantile_ts_cagee_outs --ratio --sample_group 21.1 --sample_group 21.2 --sample_group 21.3 --sample_group 21.4 --sample_group 21.5 --cores 32
+# 26
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_26_quantile_ts_cagee_outs --ratio --sample_group 26.1 --sample_group 26.2 --sample_group 26.3 --sample_group 26.4 --sample_group 26.5 --cores 32
+# 27
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_27_quantile_ts_cagee_outs --ratio --sample_group 27.1 --sample_group 27.2 --sample_group 27.3 --sample_group 27.4 --sample_group 27.5 --cores 32
+# 25
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_25_quantile_ts_cagee_outs --ratio --sample_group 25.1 --sample_group 25.2 --sample_group 25.3 --sample_group 25.4 --sample_group 25.5 --cores 32
+# 24
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_24_quantile_ts_cagee_outs --ratio --sample_group 24.1 --sample_group 24.2 --sample_group 24.3 --sample_group 24.4 --sample_group 24.5 --cores 32
+# 22
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_22_quantile_ts_cagee_outs --ratio --sample_group 22.1 --sample_group 22.2 --sample_group 22.3 --sample_group 22.4 --sample_group 22.5 --cores 32
+# 29
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_29_quantile_ts_cagee_outs --ratio --sample_group 29.1 --sample_group 29.2 --sample_group 29.3 --sample_group 29.4 --sample_group 29.5 --cores 32
+# 30
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_quantile_ts.tsv --output_prefix ratio/all/ratio_30_quantile_ts_cagee_outs --ratio --sample_group 30.1 --sample_group 30.2 --sample_group 30.3 --sample_group 30.4 --sample_group 30.5 --cores 32
+
+# took ~2 hours to run on interactive node 
+
+
+### gametologs
+# compare gametologs to rest of Z
+## ratio
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_gametolog.tsv --output_prefix ratio/ratio_gametolog_cagee_outs --ratio --sample_group Z --sample_group ZG
+
+## median
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_gametolog.tsv --output_prefix median_z/median_gametolog_cagee_outs --sample_group Z --sample_group ZG
+
+### Quantile analyses for every species
+
+### Z chromosome
+#"BB" "BS" "CW" "ET" "HS" "HW" "PW" "RO" "TS" "YW"
+# BB
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_z/BB_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_z/BB --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5
+
+# BS
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_z/BS_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_z/BS --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5
+
+# CW
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_z/CW_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_z/CW --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5
+
+# ET
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_z/ET_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_z/ET --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5
+
+# HS
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_z/HS_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_z/HS --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5
+
+# HW
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_z/HW_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_z/HW --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5
+
+# PW
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_z/PW_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_z/PW --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5
+
+# RO
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_z/RO_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_z/RO --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5
+
+# TS
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_z/TS_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_z/TS --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5
+
+# YW
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_z/YW_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_z/YW --ratio --sample_group Z.1 --sample_group Z.2 --sample_group Z.3 --sample_group Z.4 --sample_group Z.5
+
+
+
+### 4 chromosome
+#"BB" "BS" "CW" "ET" "HS" "HW" "PW" "RO" "TS" "YW"
+# BB
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_4/BB_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_4/BB --ratio --sample_group 4.1 --sample_group 4.2 --sample_group 4.3 --sample_group 4.4 --sample_group 4.5
+
+# BS
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_4/BS_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_4/BS --ratio --sample_group 4.1 --sample_group 4.2 --sample_group 4.3 --sample_group 4.4 --sample_group 4.5
+
+# CW
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_4/CW_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_4/CW --ratio --sample_group 4.1 --sample_group 4.2 --sample_group 4.3 --sample_group 4.4 --sample_group 4.5
+
+# ET
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_4/ET_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_4/ET --ratio --sample_group 4.1 --sample_group 4.2 --sample_group 4.3 --sample_group 4.4 --sample_group 4.5
+
+# HS
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_4/HS_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_4/HS --ratio --sample_group 4.1 --sample_group 4.2 --sample_group 4.3 --sample_group 4.4 --sample_group 4.5
+
+# HW
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_4/HW_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_4/HW --ratio --sample_group 4.1 --sample_group 4.2 --sample_group 4.3 --sample_group 4.4 --sample_group 4.5
+
+# PW
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_4/PW_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_4/PW --ratio --sample_group 4.1 --sample_group 4.2 --sample_group 4.3 --sample_group 4.4 --sample_group 4.5
+
+# RO
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_4/RO_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_4/RO --ratio --sample_group 4.1 --sample_group 4.2 --sample_group 4.3 --sample_group 4.4 --sample_group 4.5
+
+# TS
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_4/TS_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_4/TS --ratio --sample_group 4.1 --sample_group 4.2 --sample_group 4.3 --sample_group 4.4 --sample_group 4.5
+
+# YW
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/species_4/YW_normalizedCounts_ratio_quantile_sim_center.tsv --output_prefix ratio/ratio_species_4/YW --ratio --sample_group 4.1 --sample_group 4.2 --sample_group 4.3 --sample_group 4.4 --sample_group 4.5
+
+
+### Behavior traits
+## extra pair brood percentage
+# median species gene expression
+# comparison of high vs low EPP percentage to internal branch
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix behavior_traits/EPP/median/median_EPP_3p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_EPP_3p.nwk
+
+# Sex median species gene expression
+# comparison of high vs low EPP percentage to internal branch
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix behavior_traits/EPP/median/median_sex_EPP_3p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_EPP_3p.nwk --sample_group M --sample_group F
+
+# sex ratio
+# comparison of high vs low EPP percentage to internal branch
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix behavior_traits/EPP/ratio/ratio_EPP_3p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_EPP_3p.nwk
+
+## male incubation
+# median species gene expression
+# comparison of male incubation to internal branch
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix behavior_traits/incubation/median/median_inc_M_3p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_inc_M_3p.nwk
+
+# Sex median species gene expression
+# comparison of male incubation to internal branch
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix behavior_traits/incubation/median/median_sex_inc_M_3p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_inc_M_3p.nwk --sample_group M --sample_group F
+
+# sex ratio
+# comparison of male incubation to internal branch
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix behavior_traits/incubation/ratio/ratio_inc_M_3p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_inc_M_3p.nwk
+
+# median species gene expression
+# comparison of male incubation
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix behavior_traits/incubation/median/median_inc_M_internal_2p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_inc_M_internal_2p.nwk
+
+# Sex median species gene expression
+# comparison of male incubation
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix behavior_traits/incubation/median/median_sex_inc_M_internal_2p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_inc_M_internal_2p.nwk --sample_group M --sample_group F
+
+# sex ratio
+# comparison of male incubation
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix behavior_traits/incubation/ratio/ratio_inc_M_interal_2p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_inc_M_internal_2p.nwk
+
+## male provision female incubation
+# median species gene expression
+# comparison of male provision female incubation to internal branch
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix behavior_traits/incubation/median/median_inc_MpF_3p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_inc_MpF_3p.nwk
+
+# Sex median species gene expression
+# comparison of male provision female incubation to internal branch
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix behavior_traits/incubation/median/median_sex_inc_MpF_3p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_inc_MpF_3p.nwk --sample_group M --sample_group F
+
+# sex ratio
+# comparison of male provision female incubation to internal branch
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix behavior_traits/incubation/ratio/ratio_inc_MpF_3p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_inc_MpF_3p.nwk
+
+## male incubation assistance
+# median species gene expression
+# comparison of male incubation assistance to internal branch
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix behavior_traits/incubation/median/median_inc_ast_3p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_inc_ast_3p.nwk
+
+# Sex median species gene expression
+# comparison of male incubation assistance to internal branch
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_sex.tsv --output_prefix behavior_traits/incubation/median/median_sex_inc_ast_3p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_inc_ast_3p.nwk --sample_group M --sample_group F
+
+# sex ratio
+# comparison of male incubation assistance to internal branch
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix behavior_traits/incubation/ratio/ratio_inc_ast_3p_cagee_outs --sigma_tree ./data/behavior_traits/10_species_birds_edit_inc_ast_3p.nwk
+
+
+### Free rate model
+## gene expression species median
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix median/median_freerate_cagee_outs_2 --free_rate
+
+## sex ratio species 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix ratio/ratio_freerate_cagee_outs_2 --free_rate --ratio
+
+### Multiple gamma categories 
+## integrate n_gamma_cats command
+## median
+# 4 gamma categories 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix median/median_cagee_outs_n_gamma_cats_4 --n_gamma_cats 4
+
+# 6 gamma categories 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix median/median_cagee_outs_n_gamma_cats_6 --n_gamma_cats 6
+
+# 8 gamma categories 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix median/median_cagee_outs_n_gamma_cats_8 --n_gamma_cats 8
+
+# 10 gamma categories 
+#./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix median/median_cagee_outs_n_gamma_cats_10 --n_gamma_cats 10
+
+## ratio
+# 4 gamma categories 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix ratio/ratio_cagee_outs_n_gamma_cats_4 --n_gamma_cats 4 --ratio
+
+# 6 gamma categories 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix ratio/ratio_cagee_outs_n_gamma_cats_6 --n_gamma_cats 6 --ratio
+
+# 8 gamma categories 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix ratio/ratio_cagee_outs_n_gamma_cats_8 --n_gamma_cats 8 --ratio
+
+# 10 gamma categories 
+#./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio.tsv --output_prefix ratio/ratio_cagee_outs_n_gamma_cats_10 --n_gamma_cats 10 --ratio
+
+### gamma categories on z
+## median
+# 4 gamma categories 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_z/median_z_cagee_outs_n_gamma_cats_4 --n_gamma_cats 4 --sample_group Z
+
+# 6 gamma categories 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_z/median_z_cagee_outs_n_gamma_cats_6 --n_gamma_cats 6 --sample_group Z
+
+# 8 gamma categories 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_z/median_z_cagee_outs_n_gamma_cats_8 --n_gamma_cats 8 --sample_group Z
+
+# 10 gamma categories 
+#./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median_z.tsv --output_prefix median_z/median_z_cagee_outs_n_gamma_cats_10 --n_gamma_cats 10 --sample_group Z
+
+## ratio
+# 4 gamma categories 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/ratio_z_cagee_outs_n_gamma_cats_4 --n_gamma_cats 4 --ratio --sample_group Z
+
+# 6 gamma categories 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/ratio_z_cagee_outs_n_gamma_cats_6 --n_gamma_cats 6 --ratio --sample_group Z
+
+# 8 gamma categories 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/ratio_z_cagee_outs_n_gamma_cats_8 --n_gamma_cats 8 --ratio --sample_group Z
+
+# 10 gamma categories 
+#./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_ratio_z.tsv --output_prefix ratio/ratio_z_cagee_outs_n_gamma_cats_10 --n_gamma_cats 10 --ratio --sample_group Z
+
+#### simulate gene evolution to test CAGEE
+### simulate gene expression for sigmas: 0.005, 0.010, 0.015, 0.020
+## 100 genes
+# sigma 0.005
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.005 --output_prefix n_gamma_simulation/median_100_0.005
+# sigma 0.010
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.01 --output_prefix n_gamma_simulation/median_100_0.01
+# sigma 0.015
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.015 --output_prefix n_gamma_simulation/median_100_0.015
+# sigma 0.020
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.02 --output_prefix n_gamma_simulation/median_100_0.02
+
+### simulate gene expression for sigmas: 0.001, 0.010, 0.1, 1
+## 100 genes
+# sigma 0.001
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.001 --output_prefix n_gamma_simulation/median_100_0.001
+# sigma 0.010
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.01 --output_prefix n_gamma_simulation/median_100_0.01
+# sigma 0.1
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.1 --output_prefix n_gamma_simulation/median_100_0.1
+# sigma 1
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 1 --output_prefix n_gamma_simulation/median_100_1
+
+### simulate gene expression ratio for sigmas: 0.0003, 0.0006, 0.0009, 0.0012
+## 100 genes
+# sigma 0.0003
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.0003 --output_prefix n_gamma_simulation/ratio_100_0.0003 --ratio
+# sigma 0.0006
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.0006 --output_prefix n_gamma_simulation/ratio_100_0.0006 --ratio
+# sigma 0.0009
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.0009 --output_prefix n_gamma_simulation/ratio_100_0.0009 --ratio
+# sigma 0.0012
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.0012 --output_prefix n_gamma_simulation/ratio_100_0.0012 --ratio
+
+### simulate gene expression ratio for sigmas: 0.0001, 0.001, 0.01, 0.1
+## 100 genes
+# sigma 0.0001
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.0001 --output_prefix n_gamma_simulation/ratio_100_0.0001 --ratio
+# sigma 0.001
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.001 --output_prefix n_gamma_simulation/ratio_100_0.001 --ratio
+# sigma 0.01
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.01 --output_prefix n_gamma_simulation/ratio_100_0.01 --ratio
+# sigma 0.1
+./CAGEE/build/cagee --simulate 100 --tree ./data/10_species_birds_edit.nwk --fixed_sigma 0.1 --output_prefix n_gamma_simulation/ratio_100_0.1 --ratio
+
+### run n_gamma_cats on simulated data
+## median
+# 4 gamma categories 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./n_gamma_simulation/median_100_combined.tsv --output_prefix n_gamma_simulation/median_sim_100_cagee_outs_n_gamma_cats --n_gamma_cats 4 
+
+# large sigma
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./n_gamma_simulation/median_100_combined_large.tsv --output_prefix n_gamma_simulation/median_sim_100_large_cagee_outs_n_gamma_cats --n_gamma_cats 4 
+
+## ratio
+# 4 gamma categories 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./n_gamma_simulation/ratio_100_combined.tsv --output_prefix n_gamma_simulation/ratio_sim_100_cagee_outs_n_gamma_cats --n_gamma_cats 4 --ratio
+
+# large sigma
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./n_gamma_simulation/ratio_100_combined_large.tsv --output_prefix n_gamma_simulation/ratio_sim_100_large_cagee_outs_n_gamma_cats --n_gamma_cats 4 --ratio
+
+### run n_gamma_cats on multiple sigma simulated data
+## simulate data for multiple rates
+# 0.01
+./CAGEE/build/cagee --simulate 100 --tree ./data/sim/multi_sigma_n_gamma/tree_sigma_3_species.nwk --sigma_tree ./data/sim/multi_sigma_n_gamma/tree_sigma_3_sigma.nwk --fixed_multiple_sigmas 0.01,0.02,0.005 --output_prefix n_gamma_simulation/multi_sigma/multi_sigma_100_0.01
+
+# 0.005
+./CAGEE/build/cagee --simulate 100 --tree ./data/sim/multi_sigma_n_gamma/tree_sigma_3_species.nwk --sigma_tree ./data/sim/multi_sigma_n_gamma/tree_sigma_3_sigma.nwk --fixed_multiple_sigmas 0.005,0.01,0.0025 --output_prefix n_gamma_simulation/multi_sigma/multi_sigma_100_0.005
+
+# 0.001
+./CAGEE/build/cagee --simulate 100 --tree ./data/sim/multi_sigma_n_gamma/tree_sigma_3_species.nwk --sigma_tree ./data/sim/multi_sigma_n_gamma/tree_sigma_3_sigma.nwk --fixed_multiple_sigmas 0.001,0.002,0.0005 --output_prefix n_gamma_simulation/multi_sigma/multi_sigma_100_0.001
+
+# 0.0001
+./CAGEE/build/cagee --simulate 100 --tree ./data/sim/multi_sigma_n_gamma/tree_sigma_3_species.nwk --sigma_tree ./data/sim/multi_sigma_n_gamma/tree_sigma_3_sigma.nwk --fixed_multiple_sigmas 0.0001,0.0002,0.00005 --output_prefix n_gamma_simulation/multi_sigma/multi_sigma_100_0.0001
+
+## Use n_gamma_cats across multiple sigma
+./CAGEE/build/cagee --tree ./data/sim/multi_sigma_n_gamma/tree_sigma_3_species.nwk --sigma_tree ./data/sim/multi_sigma_n_gamma/tree_sigma_3_sigma.nwk --infile ./n_gamma_simulation/multi_sigma/multi_sigma_100_combined.tsv --output_prefix n_gamma_simulation/multi_sigma/multi_sigma_cagee_outs_n_gamma_cats --n_gamma_cats 4
+
+
+
+
+
+
+
+
+
+## median, 2 sigma
+# 4 gamma categories, 2 sigma 
+./CAGEE/build/cagee --tree ./data/10_species_birds_edit.nwk --infile ./data/normalizedCounts_median.tsv --output_prefix median/median_cagee_outs_2p_n_gamma_cats --n_gamma_cats 4 --cores 8 --sigma_tree ./data/10_species_birds_edit_cavity_2p.nwk
+# run in slurm file
+# ran for 18 hours with a single core
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### You enable the nonparametric error model AKA replicate model via --replicate_map [your_replicates_to_species_map_file.tsv], and the file takes form of:
+#SPECIES	INDIVIDUAL
+#A	A1
+#A	A2
+#B	B1
+#B	B2
+##https://github.com/hahnlab/CAGEE-testing/blob/main/error-model-notebooks/nonparametric_model_testing_v7_many_individuals.ipynb
+
+
+
+#boost 
+# check if it is installed
+module load boost
+# version 1.75.0 installed
+
+# Eigen
+module load eigen
+# version 3.4.0 installed
+
+# MKL
+module load intel
+
+## instead of MKL to get rid of "no math library available"
+# gnu
+# module load gnu
+
+# gsl
+# module load gsl
+
