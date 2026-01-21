@@ -1,0 +1,906 @@
+#### 10 species project notebook
+#### Isaac Miller-Crews 
+
+#### identifying LOC genes with ensembl ####
+
+# So I looked into the reference that was used and I'm not sure how to get around the fact that the gene names aren't fully annotated... They used the most recent reference (v1.4) and you can check for specific names here: https://www.ncbi.nlm.nih.gov/datasets/gene/GCF_003957565.2/. I was planning to use Biomart from ensembl to see if I could pull the correct gene names but that uses v1 and the protein ID's are different. Good news is that this data does seem to exist somewhere! If you look at this example (https://www.ncbi.nlm.nih.gov/gene/100227231/) you can see that it clearly is an annotated gene (Gene symbol: LOC100227231; Gene description: protein NPAT). On that NCBI page it will take you to the ensembl page where the gene has the proper name ( http://useast.ensembl.org/Taeniopygia_guttata/Gene/Summary?g=ENSTGUG00000012634;r=1:41222688-41245958;t=ENSTGUT00000013158). But NCBI lets you convert from the protein ID to the ensembl ID. From there you can pull all the ensembl gene names for these ensembl IDs. In my R script I detail how I go from the NCBI Zebra Finch Protein ID to the ensembl gene name. I don't think this is wrong but it does bring up a couple questions since one annotation is protein and the other is gene (and they come from two different versions of the same annotation).
+
+# results saved in folder: 10_sp/Gene_list
+# R script: 10_sp_gene_list_IMC.R
+
+#### identifying z chromosome genes with ensembl ####
+
+#### 03/07/2024
+# Summary: Use ensemble to get chromome name and position for each gene
+
+# results saved in folder: 10_sp/Gene_list
+# R script: 10_sp_gene_list_IMC.R
+
+# add z chromsome to new expression median species, median sex, and ratio files
+# normalizedCounts_median_sex_z.tsv, normalizedCounts_median_z.tsv, normalizedCounts_ratio_z.tsv
+
+
+#### CAGEE ####
+#### 03/01/2024
+# Summary: Re-run ratio analysis and compare output
+
+# start running with slurm and 8 cores
+# re-compile CAGEE to work with ratio data better
+
+# got a negative logliklihood result again (indicating that there may be an issue with unbounded brownian motion
+# messaged Ben Fulton to discuss possibilites 
+
+
+#### 03/07/2024
+# Summary: Re-run cagee with median of multiple sigmas and multiple gamma; z-chromsome
+
+# run slurm script since interactive node timed out after 4 hours
+# save results: median/median_cagee_outs_2p_n_gamma_cats
+
+# run cagee with median species expression calculating separate sigma for genes on Z vs autosome 
+# save results: median_z/median_z_cagee_outs
+
+# z chromosome does evolve faster! 
+# similar ratio as predicted here (1.2-1.3): https://www.nature.com/articles/s41559-019-0850-1
+
+#### 03/08/2024
+# Summary: Graph z chromosome gene expression change across species 
+
+# create folder 10_sp/z_chromosome
+# use R script: 10_sp_z_chromosome_IMC.R 
+
+# pull ratio data and z chromosome position data
+# graph across chromosome ratio of m:f for each species
+# '10_sp/z_chromosome/figure/gene expression ratio z chromosome across species color.png'
+
+## Note: Important - need to set cpus-per-task to the number of cores for cagee to run quicker! 
+
+# Get sex expression data from this paper: https://doi.org/10.1016/j.jgg.2020.10.005
+
+# show that birds do not have dosage compensation on Z the way mammals do on X
+
+#### 03/18/2024
+# Summary: Run cagee on Z chromosome for each sex separately
+
+# compare to see if the Z evolves at different rates between the sexes
+# z chromosome and autosomes show only minor difference (slightly higher in males) in sigma
+# save in /median_z
+
+# clone newest CAGEE from git so that ratio works 
+## re-run ratio analyses for cavity nesting
+
+#### 03/18/2024
+# Summary: Run cagee on Z chromosome for each sex separately, with ratio
+
+# save in /ratio
+# z chromosome evolves faster in gene expression sex ratio
+
+# separate sex ratio genes into quantiles
+# want to test sigma for genes in different quantiles of sex ratio 
+# compare between Z chromosome and similar size autosome (chromosome 4 and 7)
+# use quantiles from tree swallow
+# use file: CAGEE/data/normalizedCounts_ratio_quantile_ts.tsv
+
+# graph quantile average of gene expression sex ratio for each gene across species
+# Genes on Autosome appear normally distributed around 3 (middle quantile)
+# Genes on Z chromsome appear flatter, indicating that extremes are more conserved?  
+
+#### 03/20/2024
+# Summary: Run cagee on simulated Z chromosome
+
+# create simulated Z chromosome with random uniform distribution (from a ratio of 0.6667 to 1.5)
+# calculate quantiles from Tree Swallow and run cagee: CAGEE/data/normalizedCounts_ratio_quantile_ts_sim.tsv
+# create a similar uniform distribution cenetered around exp(0.5) as a shifted bias dataset
+# CAGEE/data/normalizedCounts_ratio_quantile_ts_sim_0.5.tsv
+
+# create simulated Z chromosome with random normal distribution (with standard deviation from chromosome 4 and 7)
+# calculate quantiles from Tree Swallow and run cagee: 
+# no bias
+# CAGEE/data/normalizedCounts_ratio_quantile_ts_sim_.norm.tsv
+# bias shifted to exp(0.5)
+# CAGEE/data/normalizedCounts_ratio_quantile_ts_sim_0.5.norm.tsv
+
+# compare sigma results from simulated to real results
+# CAGEE/global_figures/chromsome_evolution/quantile real vs simulated chromosome.png
+
+#### 03/21/2024
+# Summary: Run cagee on simulated Z chromosome
+
+# run simulated z chromosome on centered data
+# CAGEE/data/normalizedCounts_ratio_quantile_ts_sim_center.tsv
+# centered z chromosome still shows lower than expected female biased gene evolution rate
+
+## need to simulate evolution! 
+# steps:
+# 1. Create random distribution of ratio data to serve as the root values (four groups: normal/uniform distribution and with/without male bias)
+# 2. Simulate evolution with cagee using a fixed sigma on this random root value data (fixed sigma shouldn't matter but using the one for the sex ratio from the entire dataset: 0.000380)
+# 3. Take this simulated output, assign genes to quantiles for one species
+# 4. Test quantiles for different sigma rates to see if we get u-shaped
+
+#### 03/22/2024
+# Summary: Run cagee on simulated Z chromosome
+
+# 1. create root distribution data. Take random distribution's already calculated for all species and just pull the one for tree swallow, rename as root data. Needs to be in format: "tab-separated file specifying transcript root value (col 1) and root weight values (col 2)"
+# saved in folder: CAGEE/data/sim/
+
+# 2. Simulate evolution with cagee using a fixed sigma on this random root value data (0.000380)
+# issue with running simulation using rootdist file: "Segmentation fault (core dumped)"
+# fixed by using "file:filename.tsv" and reformatting input files to match 
+
+# 3. Take this simulated output, assign genes to quantiles for one species
+# In R, pull simulated data and calculate quantiles
+# Appened gene name and dene descriptions just to format for quantile
+# need to remove first 4 rows with hastags from cagee output
+# Quantile groups are not equal for some reason...
+
+#### 03/26/2024
+# Summary: re-do root distribution analysis
+
+# problem with quantiles likely do to error with rootdist 
+# the second column for the rootdist file should be the weight within the distribution (not the fixed sigma as done before)
+# the rootdist file describes the distribution at the root! 
+# "tab-separated file specifying value(col 1) and root distribution weight (col 2)"
+
+# run cagee evolution again 
+
+# same issue with binning of evolved genes that cannot be separated into even quantiles
+# asking Ben and Jason for help
+
+#### 04/12/2024
+# Summary: Compare Z chromsome genes to location in anolis genome
+
+# found papers showing gene by gene selection in anolis and rattle snake X
+# use ensembl in '10_sp_gene_list_IMC.R' to check which anolis chromsomes the bird Z genes are on
+# "z_chromosome/Other_birds/figures/Anolis Z chromsome genes.png"
+# most fall on anolis chromsome 2 as expected
+
+#### 04/16/2024
+# Summary: Test updated simulation code
+
+# Ben updated code (removed the "5" from 'max(root size)+ 4.5 * sigma * sqrt(t)')
+# update CAGEE and run with unifrom distribution to test number of genes in each quantile after evolution
+# Worked to create even quantile groups
+# Re-ran for each random distribution
+# Save new evolved dataframe with quantiles into:
+# 'CAGEE/data/normalizedCounts_ratio_quantile_ts_sim_evo.tsv'
+# 'CAGEE/data/normalizedCounts_ratio_quantile_ts_sim_0.5_evo.tsv'
+# 'CAGEE/data/normalizedCounts_ratio_quantile_ts_sim_norm_evo.tsv'
+# 'CAGEE/data/normalizedCounts_ratio_quantile_ts_sim_norm_0.5_evo.tsv'
+
+# run CAGEE on evolved simulation data
+# save results in sim/ratio
+
+# add evo simulation to R graphs
+# evolved simulations have equal sigma across quantiles (maybe slight increase at tips) 
+
+#### 04/16/2024
+# Summary: Test variations on quantile sigma rates
+
+# create synteny style graph for quantiles across species using rank list
+# CAGEE/global_figures/chromsome_evolution/TS_Z_quantile/
+# use 'convert *png filename.gif' to convert all png files in a folder into a gif
+
+#### 04/19/2024
+# Summary: run quantile sigma rate with male-bias shifted data
+
+# shift all chromosomes besides Z by: 'exp(log(ratio)+0.5)'
+# save shifted data with tree swallow quantiles: CAGEE/data/normalizedCounts_ratio_quantile_ts_shifted.tsv
+# run cagee on each quantile for chromosomes 4 and 7
+
+#### 04/30/2024
+# Summary: run quantile sigma rate on all autosomes
+
+# run on interactive terminal (issues running slurm script)
+# save in ratio/all
+# add figures to 'CAGEE/global_figures/chromsome_evolution/'
+
+# small chromosomes have higher rate than Z, but most large ones are U-shaped
+
+#### 04/30/2024
+# Summary: scale variance of Z chromosome to match those of autosome
+
+# Test quantile sigma on Z when both scaled and centered
+# take the average variance (standard deviation) of chromosomes 4 & 7 and apply to Z chromosome
+# run CAGEE on 'CAGEE/data/normalizedCounts_ratio_quantile_ts_sim_scale.tsv' [ratio/ratio_z_sim_scale_quantile_ts_cagee_outs]
+# Results in a supressed sigma line across quantiles
+
+#### 05/02/2024
+# Summary: switch warblers in newick file
+
+# Want to switch warblers so that appear better in image
+# Need to make sure that cavity nesting file matches data
+# Just the flipped the original newick file (others appeared the same)
+
+# create old files and folders to save previous results
+# Re-run cavity median and ratio CAGEE analysis with updated newick files
+
+#### 05/13/2024
+# Summary: Run 4 parameter model for sex ratio and species median
+
+# run cagee with species median and sex ratio seperating out cavity nesters, open nesters, and flexible nesters
+# Fleixble nesters higher in species median
+# cavity nesters higher in sex ratio data
+
+# both models have log liklihood that are not close to the other models
+
+#### 05/14/2024
+# Summary: Calculate DEG between blue birds and tree swallow males and females
+
+# 10_sp/DEG/scripts/10_sp_DEG_IMC.R
+
+# pvclust of blue birds vs tree swallows has almost complete seperation of species
+# sex also appears to separate
+# no major outliers
+
+# the major driver in sex difference is the Z chromosome  
+
+#### 05/16/2024
+# Summary: How does dosage compensation compare with expression level?
+
+# compare average rank of M:F across species to average rank of expression level for each chromosome
+# Use average rank of gene expression in male for values above 0 in M:F ratio centered
+# Use average rank of gene expression in female for values below 0 in M:F ratio centered
+
+# saved figures for each chromosome here: CAGEE/global_figures/chromsome_evolution/average_rank/
+
+# maybe the Z is more evenly distributed? Not a great visualization and hard to tell what is going on
+
+#### 05/21/2024
+# Summary: Species data for analysis outside of cavity nesting
+
+# all species data saved in 10_sp/Species_Data
+
+# Cavity.Agg.Collect.Allyears.Cavity.Agg.Collect_IMC.csv
+# data for specific samples in the 10 species study by Lipshutz
+# mass, wing length, testosterone, assay behavior, distance, aggression score (most samples)
+# Also song and vocalization
+# Could make PCA of aggression style...
+
+# SexroleEcologyFinal_all_IMC.csv
+# Data from: Gonzalez-Voyer A, Thomas GH, Liker A, Krüger O, Komdeur J, Székely T. Sex roles in birds: Phylogenetic analyses of the influence of climate, life histories and social environment. Ecol Lett. 2022 Mar;25(3):647-660. doi: 10.1111/ele.13938. PMID: 35199926.
+# relative investment of sexes in: chick brooding, chick defense, chick feeding, incubation, nest building, nest guarding, post-fledging feeding, post-fledging guarding
+# proportion of broods that contain extra-pair offspring
+# male and female: mass, tail length, tarsus length, wing length
+# plumage dimorphism: head, back, belly, wings, tail
+# ecological traits: mean temp, mean precipitation 
+# calculated factors: sexual size dimorphism, sex different in polygamy score, average relative investment of sexes in parental care, overall extent of sex role bias (phylogenetic PCA)
+
+# SPP list, data 7.4.19_IMC.csv
+# Data compiled by Rosvall
+# dimorphism, colorful/drab, EPP% offspring/brood, territory type, distance (?), male provision female   
+
+# main traits: plumage, promiscuity, parental care, aggression
+
+#### 05/31/2024
+# Summary: Identify gametologs
+
+# gametologs (homologous genes on the Z and W) may have compensated expression
+
+# use Collared flycatcher gametolog list from: Smeds, L., Warmuth, V., Bolivar, P. et al. Evolutionary analysis of the female-specific avian W chromosome. Nat Commun 6, 7330 (2015). https://doi.org/10.1038/ncomms8330
+# table 1 has ensembl IDs (appears to be a common list and lots of overlap with other bird species: Xu, L., Auer, G., Peona, V. et al. Dynamic evolutionary history and gene content of sex chromosomes across diverse songbirds. Nat Ecol Evol 3, 834–844 (2019). https://doi.org/10.1038/s41559-019-0850-1
+# can also check here: Bellott DW, Skaletsky H, Cho TJ, Brown L, Locke D, Chen N, Galkina S, Pyntikova T, Koutseva N, Graves T, Kremitzki C, Warren WC, Clark AG, Gaginskaya E, Wilson RK, Page DC. Avian W and mammalian Y chromosomes convergently retained dosage-sensitive regulators. Nat Genet. 2017 Mar;49(3):387-394. doi: 10.1038/ng.3778. Epub 2017 Jan 30. PMID: 28135246; PMCID: PMC5359078.
+# and here: Xu L, Zhou Q. The Female-Specific W Chromosomes of Birds Have Conserved Gene Contents but Are Not Feminized. Genes (Basel). 2020 Sep 25;11(10):1126. doi: 10.3390/genes11101126. PMID: 32992746; PMCID: PMC7599627.
+
+# use ensembl to convert flycatcher gametologs to zebrafinch
+# results saved in folder: 10_sp/Gene_list
+# R script: 10_sp_gene_list_IMC.R
+
+# start with 44 gametologs, get 33 zebra finch orthologs, end up with 25 gametologs in the 10sp data
+# saved list: Gene_list/10sp__ensembl_gametologs.tsv
+
+# compare distribution of gametologs with sex ratio data
+# saved figures: z_chromosome/figures/gametolog/
+
+# does appear on average gametologs are lower and may be overrepresented in the first quantile
+
+# Create gametolog file for CAGEE:  'CAGEE/data/normalizedCounts_ratio_gametolog.tsv', 'CAGEE/data/normalizedCounts_median_gametolog.tsv'
+
+# CAGEE the gametologs appear to evolve at the same rate in terms of sex ratio
+# sex ratio
+# Final -lnL: 9560.0369076774
+# Best matches are: 
+# Sigma for Z: 0.00074040651688696
+# Sigma for ZG: 0.00073911527104096
+
+# median (before 0.014351138838547)
+# Final -lnL: 14398.173178438
+# Best matches are: 
+# Sigma for Z: 0.015104188822057
+# Sigma for ZG: 0.0095485148509543
+
+# Run quantile analysis with shifted data without gametologs?
+
+
+#### 06/03/2024
+# Summary: Try to find remaining gametologs, test other bird quantiles
+
+# have only 25 of 44 genes, but think I can find more orthologs using blast
+# take list of flycatcher gametologs that did not translate in ensemble and blast sequence 
+# fill out new names into: 10_sp/Gene1_list/10sp_ensembl_gametologs_edit.tsv
+
+# saved all genes for flycatcher and edited with blast results 'Ficedula albicollis_gametologs_zebrafinch_edit.csv'
+
+# search ensembl for fly catcher gene, take protein sequence and blastp, use Accession value to search normalizedCounts to see if ZebraFinchProteinID is in data. Add the GeneName to list. 
+
+# End up with 35 orthologs! (increase from 25)
+# 3 have no chromosome assigned, but include them anyway
+
+# re-ran CAGEE
+# median (Before Z had sigma 0.014351138838547)
+# Final Likelihood (-lnL): 14508.7
+# Sigma2: Sigma for Z: 0.015202865660113
+# Sigma for ZG: 0.010788263322505
+
+# ratio (before the Z was around 0.0007)
+# Final Likelihood (-lnL): 9637.14
+# Sigma2: Sigma for Z: 0.00070890367564914
+# Sigma for ZG: 0.0012192778940697
+
+# run CAGEE quantile tree swallow analysis on Z with gametologs removed and centered 'CAGEE/data/normalizedCounts_ratio_quantile_ts_sim_center_game.tsv' and 'normalizedCounts_ratio_quantile_ts_sim_game.tsv'
+
+# created upsetR plot of gametologs across birds and songbirds:z_chromosome/figures/gametolog/
+
+# run the Z centered analysis with every bird: CAGEE/ratio/ratio_species_z/
+# data saved in: CAGEE/data/species_z
+
+# z looks like random noise with general 'U-shape'
+#'CAGEE/global_figures/chromsome_evolution/quantile/all birds quantile sigma.png'
+
+# run on chromsome 4 across species for comparison with Z
+# Z is much less consistent across species, but the noise is consistent
+
+# Possible to simulate root distribution with larger outliers?
+# Or use the ancestral root node to assign category rankings (quantile)? 
+
+#### 06/04/2024
+# Summary: Create trait across species graphic
+
+# create R script: 10_sp/Species_Data/10_sp_behavior_trait_IMC.R
+
+# traits recommended by Lipshutz: degree of sexual dichromatism, song, migration (vs resident), foraging guild (eg insectivore, granivore), extra-pair paternity, body size/sexual size dimorphism, clutch size, sex ratio
+
+# use data compiled by Rosvall: SPP list, data 7.4.19_IMC.csv
+# it has: dimorphism, colorful/drab, EPP% offspring/brood, territory type, distance (m), male provision female   
+
+# saved figure here: "Species_Data/figures/Species traits 10_sp birds heatmap.png"
+# missing: song, migration, foraging guild, sex ratio
+
+# seems like territory type (nesting vs general) with 5/10 species (single clade of robin and bluebird)
+# Also, extra pair mating (broods seems better), with high/low (<50%/<50%) with 4/10
+# male provision female? 4/10
+
+# decided to move forward with extra pair brood and male incubation/provisioning
+
+#### 06/05/2024
+# Summary: Create tree summary graphic of new behavior/traits
+
+# want to show high and low extra pair brood
+
+# want to compare incubation males, male provisioning female during incubaiton, and male incubation score
+
+# created tree figures with selected behavior traits, and tree with a heatmap of incubation traits
+
+# Do we need other species to reconstruct ancestral state of traits?
+# Paper has a reference for lots of birds with EPP rates and incubation: Søraker, J. S., Wright, J., Hanslin, F. Ø., & Pepke, M. L. (2023). The evolution of extra-pair paternity and paternal care in birds. Behavioral ecology : official journal of the International Society for Behavioral Ecology, 34(5), 780–789. https://doi.org/10.1093/beheco/arad053
+# added data: "Species_Data/data/Soraker_etal_BehEco_2023_S1.csv"
+
+#### 06/12/2024
+# Summary: Run CAGEE on gene expression and sex ratio for new traits
+
+# Need to create new sigma trees for:
+# extra pair broods with high/low (<50%/<50%) with 4/10
+# Three male incubation traits: provision female during incubation (4/10), male incubation (3/10), male incubation assitance score [binary of previous one or the other of the previous two traits] (7/10)
+
+# while trying to decide how best to treat internal branches, going to test the same as cavity nesting with internal vs external
+
+# saved trees into folder: 10_sp/CAGEE/data/behavior_traits
+
+# EPP: 10_species_birds_edit_EPP_3p.nwk
+
+# male incubation: 10_species_birds_edit_inc_M_3p.nwk
+# male provision female incubation: 10_species_birds_edit_inc_MpF_3p.nwk
+# male incubation assistance score: 10_species_birds_edit_inc_ast_3p.nwk
+
+# CAGEE results saved in: 10_sp/CAGEE/behavior_traits/
+
+# EPP results (internal, low, high):
+# median: Final -lnL: 336581
+# 0.0062, 0.0136, 0.0137
+
+# sex median: Final -lnL: 677459
+# M: 0.0062, 0.0146, 0.0153
+# F: 0.0062, 0.0145, 0.0142 
+
+# ratio: Final -lnL: 282976
+# 0.000066, 0.000740, 0.000614
+
+# male incubation results (internal, male doesn't incubate, male incubates):
+# median: Final -lnL: 335987
+# 0.0063, 0.0118, 0.0186
+
+# sex median: Final -lnL: 676222
+# M: 0.0063, 0.0129, 0.0198
+# F: 0.0062, 0.0122, 0.0201
+
+# ratio: Final -lnL: 281309
+# 0.000048, 0.000555, 0.001154
+
+# male provision female incubation results (internal, male doesn't provision, male provisions):
+# median: Final -lnL: 336581
+# 0.0062, 0.0136, 0.0136
+
+# sex median: Final -lnL: 677460
+# M: 0.0062, 0.0149, 0.0148
+# F: 0.0062, 0.0143, 0.0144
+
+# ratio: Final -lnL: 283004
+# 0.000065, 0.000736, 0.000622
+
+# male incubation assistance results (internal, male doesn't assist, male assists):
+# median: Final -lnL: 335911
+# 0.0067, 0.0092, 0.0154
+
+# sex median: Final -lnL: 676104
+# M: 0.0067, 0.0106, 0.0167
+# F: 0.0065, 0.0094, 0.0165
+
+# ratio: Final -lnL: 281973
+# 0.000048, 0.000468, 0.000839
+
+# no difference in rate for median or sex ratio for EPP or male provision female
+# Higher rate (both median and sex ratio) for male incubators and male assistance (possibly driven by male incubation)
+
+# still want to test with internal branches categorized into incubation and non-incubation
+
+# test with internal branches categorized
+# male incubation results (male doesn't incubate, male incubates):
+# median: Final -lnL: 337244
+# 0.0102, 0.0146
+
+# sex median: Final -lnL: 679178
+# M: 0.0111, 0.0155
+# F: 0.0105, 0.0158
+
+# ratio: Final -lnL: 288749 
+# 0.000419, 0.000789
+
+#### 06/14/2024
+# Summary: Compare RRHO2 results with phylogenetic distance
+
+# does concordance (or discordance) correlate with phylogenetic distance?
+# want to make a scatter plot comparing up-up/down-down gene count to phylogenetic distance in tree
+# scatterplot with phylogenetic distance on the x and number of genes on the y?
+
+# try with cavity nesting DEG data from Lipshutz paper
+# download DEG files from Sharepoint: "Projects not within Field Seasons/CavityNester 10sp Lipshutz/Analyses/RRHO"
+# example file name: "CN_Species_DEGs_Wrens.csv"
+# Have 5 one for: Wrens, Warblers, Thrushes, Swallows, Sparrows
+# save to: 10_sp/Cavity_nesting_DEG
+
+# want to create RRHO2 plot for each comparison too
+
+# create new r script: 10_sp/DEG/scripts/10_sp_CN_DEG_IMC.R
+
+# figures saved to: 10_sp/DEG/figures/RRHO_cavity
+
+# dynamic range of clades is too small to get a real idea on what is happening
+# but generally appears that concordance is related to distance
+# while discordance is does not show a relationship
+
+# did DEG across sex for each species and then pairwise RRHO for each species 
+# calculated concordance with phylogenetic distance
+
+#### 06/18/2024
+# Summary: Test out paired freerate model with 10 species
+
+# want to see if a specific lineage is driving difference 
+# use free rate model to test on species median and sex ratio
+# save results: median/median_freerate_cagee_outs
+# save results: ratio/ratio_freerate_cagee_outs
+
+## need to git pull and remake file from here since it was not pushed to main
+# https://github.com/hahnlab/CAGEE/tree/freerate
+
+# use git pull, then use: git checkout freerate
+# then remove build folder and recompile
+
+# works with median data but not ratio data
+# changed line 76 of freerate_model.cpp to 10 instead of 5 and rebuilt built
+
+#### 06/24/2024
+# Summary: Graph median free rate results
+
+# create figures for free rate median gene expression
+# show negative correlation with branch length and free rate sigma
+
+#### 07/08/2024
+# Summary: ratio free rate results
+
+# add more precision by changing line 133 of freerate_model.cpp to 20 (originally 5, but then changed to 10 before)
+# rebuild CAGEE after change
+
+# still get very similar results even when using precision up to 100 (tried 20 and 50 first)
+# all nodes are getting essentially the same value
+
+#### 07/17/2024
+# Summary: test out new paired free rate model
+
+# use: git pull
+# then use: git checkout freerate
+# then remove build folder and recompile
+
+# run median and ratio free rate again
+# save results in: median_freerate_cagee_outs_2 & ratio_freerate_cagee_outs_2 
+
+# worked with ratio data
+
+#### 07/23/2024
+# Summary: check if MHM region of Z chromosome has lower expression
+
+# use 10_sp_z_chromosome_IMC.R
+
+# region of bird Z chromosome between 
+# MHM1  25–35 Mb: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4596671/
+# Use gtools for running function to get moving window average across 30 genes with shift of 1 gene. Also, calculate confidence interval for median expression with 1000 bootstrap, use wilcoxon test to compare to entire chromosome 
+
+# MHM1 25–35 Mb & MHM2 72.5–73.5 Mb:https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6771406/
+# Use changepoint.np package in R to find change points in chromosome data
+
+# For each species along Z chromsome want to: calculate the change points, graph change points across species, graph moving average across species, calculate confidence interval for MHM1 and rest of Y genes along with wilcox values, graph boxplots of MHM1 vs other genes for each species 
+
+# seems that there is overlap in change point but no conserved signal...
+
+# THESE ARE THE WRONG CHROMOSOMAL LOCATIONS
+
+#### 07/25/2024
+# Summary: Calculate sigma categories for genes with n_gamma_cats
+
+# use "git pull" in CAGEE folder to get new update and rebuild CAGEE
+
+# tried with median gene expression and sex ratio for all genes and just Z genes
+
+# get error: "Failed to initialize any reasonable values"
+
+# deleted CAGEE folder and did another git clone and rebuild
+
+# ran twice with 4 and 10 gamma categories 
+# worked for both median and ratio data! 
+
+# graph in R 
+
+# appears that if you assign genes by top liklihood it splits them into two categories:
+# half go into the top and half go into the bottom sigma category
+
+#### 07/26/2024
+# Summary: Create simulated data at different sigma and run with n_gamma_cats
+
+# use simulation to create ratio and gene expression data for various sigma across 10 species tree for 100 genes each
+
+# gene expression sigma: 0.005, 0.010, 0.015, 0.020
+# ratio sigma: 0.0003, 0.0006, 0.0009, 0.0012
+
+# files saved in n_gamma_simulation/ in simulation.txt files
+
+# graphed results and genes are still split into the two extreme gamma categories
+# also the genes from the lowest sigma rates are assigned to the highest gamma category
+
+# Matt thinks that the gamma category values are the multiple of the average sigma
+# But that would mean that would still mean that the sigma rates and gamma categories don't match?
+
+#### 08/07/2024
+# Summary: Test n_gamma_cats parameters
+
+# run simulation with bigger jumps in sigma 
+# Also try assigning genes to lowest value category and create rate for each gene with weighted probability 
+
+# looks like assigning to lowest liklihood gamma category gave expected results. Genes are spread out much more evenly across gamma categories (which look like a gamma curve), the simulated genes appear to fall into the appropriate categories based on the simulated rate, and the simulated rate vs calculated gamma rate is closer to 1:1 (except for the big jumps in sigma since 4 categories prob isn't enough). 
+
+# Ben made change so duplicate folder for n_gamma_simulation, duplicate global_figures/n_gamma, run git pull, and re-do analysis on simulated data first
+
+# doesn't seem to have made a big difference but re-ran everything again
+
+# next need to compare gene sigma rates with sex bias
+
+#### 08/08/2024
+# Summary: Compare multiple gamma category models
+
+# for median gene expression and sex ratio (for all and for z) compare n categories: 4,6,8,10
+# run n_gamma_cats for 6 and 8
+
+# can't compare -lnl for each model! 
+# the model with the most categories is always the lowest value
+# using 10 categories for "computational convience" 
+
+#### 08/13/2024
+# Summary: Analyze Z chromosome in 10 category models
+
+# check for distribution of Z in median gene expression across 10 gamma categories compared to autosomes
+
+# Look at ancestral state of sex ratio vs gamma category
+# if min is above 0 or max is below 0 should get to ancestral sex biased genes
+
+# credible_intervals.tab for n_gamma_cats runs has a single value for max and min at every position (different from credible_intervals.tab of regular CAGEE run)
+# impacts both median and ratio 
+# messaged cafe team for feedback
+
+# Use ancestral state of sex ratio and not credible intervals! 
+
+# Made the autosome vs Z median categories for both median and sex ratio (note: x axis is now sigma category). Z looks higher!
+# I also made a figure comparing sigma category and ancestral state. I put a bunch of figures in here (number of genes per category, violin plot, boxplot, ratio value of 2 [dashed line], overall mean [solid line which is a ratio of ~1.53], and mean per category [red dot]). Almost no Z genes have an ancestral state of M:F above 2, with the average ~1.53.
+# I then did the same for all genes (including the Z). Shows that the sex ratio is basically 0 across bins.
+# This confirms what the quantile data found which shows no strong pattern of slower evolution for more sex-balanced genes? Or no higher rate for strongly male-biased genes?
+
+#### 08/21/2024
+# Summary: Calculate stats for sigma categories and ancestral state
+
+# for each sigma category, compare ancestral state gene expression sex ratio to see if it is different from 0
+# for Z chromosome use mean of all ancestral Z genes (~1.5) 
+
+# need to do an adjusted pvalue using a non-parametric test
+# wilcox.test doesn't work as there are ties in the data
+# likely need a permutation approach
+
+# perm.t.test
+# http://users.stat.umn.edu/~helwig/notes/nptest-notes.html
+# https://mac-theobio.github.io/QMEE/lectures/permutation_examples.notes.html#using-coin
+
+# use the np.loc.test to wilcoxon signed rank test with permutation (1000) and corrected for multiple testing compared to the overall mean
+# just use the results from the Z chromosome which show no significant difference for any category compared to the mean
+# (note: all genes do have sig diff in the slower categories with a slight female bias, but doesn't seem like a real effect)
+
+#### 08/27/2024
+# Summary: Set up GO term analysis
+
+# use fast rate of 10 gamma categories
+# for both median and sex ratio
+
+#### 08/27/2024
+# Summary: Run up GO term analysis
+
+# do with and without Z genes, compare to GO terms of all genes
+
+# use AnnotationForge to make organism database
+# use ensembl to get go terms for gene names
+# end up with 8016 genes with a GO term
+
+# no go terms significant for fast genes of median or ratio
+# Slow genes have a lot of significant GO terms
+# saved figures for slow genes in CAGEE/global_figures/GO
+
+# compared gene rate categories between median and ratio
+# are fast evolving genes also fast evolving in ratio?
+# CAGEE/global_figures/n_gamma/compare/
+
+
+
+#### 10/03/2024
+# Summary: Compare DEG results with Z chromosome
+
+# create upsetR figures of DEG with Z chromsome: 'DEG/figures/All_sex/upset/'
+
+# get stats for DEGs:
+#  direction    mean    sd
+#  <fct>       <dbl> <dbl>
+#1 female_bias   56   53.7
+#2 male_bias    248.  81.8
+
+# get stats for DEGs across Z and autosomes:
+#  direction   chr    mean     sd
+#  <fct>       <fct> <dbl>  <dbl>
+#1 female_bias A      53.2 52.3  
+#2 female_bias Z       2.2  0.789
+#3 male_bias   A      48.7 46.1  
+#4 male_bias   Z     190.  41.4 
+
+#### 12/10/2024
+# Summary: Run cavity nesting lineages for males, females, and Z
+
+# want to compare evolution of males and females seperately 
+# use species median
+# run for different cavity nesting and save results: 10_sp/CAGEE/median_cavity/sex/
+
+# want to compare evolution of Z for Autosomes seperately
+# use species median
+# run for different cavity nesting and save results: 10_sp/CAGEE/median_cavity/Z/
+# use ratio
+# run for different cavity nesting and save results: 10_sp/CAGEE/ratio/Z/
+
+# create figures for presentation in global_figures
+# remove facultative from comparison
+
+#### 12/10/2024
+# Summary: Run individual cagee models for sex, Z, and interaction
+
+# want to get likelihood that can be used to be compared between cavity nesting models that use sex and Z
+# need to run cagee for each sex seperately, for Z and autosomes seperately, and for Z by sex interaction seperately
+# median each sex seperately 
+# median Z and A seperately
+# median male Z, male A, female Z, female A
+# ratio Z and A seperately
+
+# create summary table of all models: 10_sp/CAGEE/CAGEE_models_summary
+# data.type = if it was run on median or ratio
+# model = is the type of model (1= 1 parameter, 2 = interval vs external, 3 = cavity vs open, 4 = cavity+facultative vs open)
+# model.pos = order it appears in the model (1 = internal, 2 = cavity or cavity+facultative, 3 = open)
+# parameter = just use to order all models of the same type (1-9)
+# lnl = log liklihood for the model
+# sigma = evolutionary rate
+# type = what type of analysis (All = all genes, Z = Z genes, A = non-Z genes, M = just males, F = just females, MZ = Z genes for just males, FZ = Z genes for just females, MA = non-Z genes for just males, FA = non-Z genes for just females).
+
+# median All: cavity model is slightly sig compared to 2p model (diff = 5)
+# median M: no sig difference between cavity and 2p model
+# median F: sig difference cavity than 2p model (diff = 8)
+
+# median MZ: no sig diff 
+# median FZ: no sig diff 
+# median MA: no sig diff 
+# median FA: sig difference (diff = 8)
+
+# median Z: no sig diff
+# median A: slight sig diff (diff = 4)
+
+# ratio all: sig diff (diff = 54)
+# ratio A: sig diff (diff = 69)
+# ratio Z: no sig diff
+
+# type model lnl
+median	1	337733 all
+median	2	336583 all
+median	3	336577 all
+median	4	336553 all
+median	1	337690 AvsZ
+median	2	336534 AvsZ
+median	3	336533 AvsZ
+median	4	336501 AvsZ
+
+# type model lnl
+ratio	1	214132 all
+ratio	2	208787 all
+ratio	3	208723 all
+ratio	4	208765 all
+ratio	1	213901 AvsZ
+ratio	2	208525 AvsZ
+ratio	3	208664 AvsZ
+ratio	4	208585 AvsZ
+
+# the AvsZ combined model is always better than all gene model
+
+# want to test if 400 genes is too small for the ratio data to get significance
+# run ratio on 400 random genes: normalizedCounts_ratio_z_rand.tsv
+# Do not get significance in autosomes with 400-440 random genes (using ratio)
+# you do get slight significance when you run 1623, 1225, 872, 813
+
+#### 05/01/2025
+# Summary: Test mutli-sigma and n_gamma_cats
+
+# simulate data to see if CAGEE can handle multiple rate categories across multiple lineages
+
+# going to simulate 4 base rates across simple 4 species tree (i.e. 0.0001, 0.001, 0.005, 0.01)
+# when simulating going to use a sigma tree so each branch actually gets a different rate
+# So each branch is assigned a multiplier (e.g. 1x, 0.5x, 1.5x, etc.) that will be multiplied by the base rate
+# then combine all of these simulations to see if CAGEE will identify them
+# 100 genes for each rate (400 total)
+
+# set up sigma tree newick files
+# species tree
+# ((SpA:2,SpB:2):2,(SpC:2,SpD:2):2);
+# 10_sp/CAGEE/data/sim/multi_sigma_n_gamma/tree_sigma_3_species.nwk
+
+# sigma tree
+# ((SpA:1,SpB:2):3,(SpC:1,SpD:2):3);
+# 10_sp/CAGEE/data/sim/multi_sigma_n_gamma/tree_sigma_3_sigma.nwk
+
+# multiplier: 1 = 1x, 2 = 2x, 3 = 0.5x
+
+# fixed sigma rates
+# 0.0001 rates = 0.0001,0.0002,0.00005
+# 0.001 rates = 0.001,0.002,0.0005
+# 0.005 rates = 0.005,0.01,0.0025
+# 0.01 rates = 0.01,0.02,0.005
+# save files: n_gamma_simulation/multi_sigma/
+
+# combine files into R and rename transcripts with suffix of rate 
+# CAGEE/n_gamma_simulation/multi_sigma/multi_sigma_100_combined.tsv
+
+
+#### 05/05/2025
+# Summary: Comparison of median and sex ratio evolution
+
+# want to compare evolutionary rate of genes (gamma category) for median and sex ratio across the tree
+# made heat map 
+# used phyper to perform hypergeometric test (one-tailed Fisher's exact test) for enrichment/over-representation (fdr corrected)
+# saved figure: 'CAGEE/global_figures/n_gamma/compare/heatmap median vs ratio sigma cat.png'
+
+#### 05/22/2025
+# Summary: Model significance for Z
+
+# want to significantly compare Z and A
+# Need models for median of MZ+MA+FZ+FA:
+# 1) All together
+# 2) MA+MZ vs FA+FZ (Males vs Females)
+# 3) MA+FA vs MZ+FZ (A vs Z)
+# 4) MA+FA vs MZ vs FZ (MZ vs FZ)
+
+# The best fitting model was MA vs FA vs MZ+FZ
+# Had same likelyhood as the 4 parameter model (MA vs FA vs MZ vs FZ)
+
+# need 2 models for M:F ratio for AvsZ:
+# 1) A+Z
+# 2) A vs Z
+# re-ran these just to make sure
+
+# Found that best fitting model indicates that Z is faster than A but there is no sex difference in Z rates. Also, that male rate is slightly faster than female rate.
+
+# Know Z is faster than A from overall species data too
+
+# Similar, the Z evolves faster in sex ratio than A
+
+# Even though males are slightly faster than females, and we expect Z to be faster in males anyway, the male Z isn't difference could be due to the small number of genes on the Z being difficult to distinguish between males and females? 
+
+#### 06/05/2025
+# Summary: Stats for Z vs Autosome
+
+# make Z ridge plot with Autosomes. Use R script: 10_sp_z_chromosome_IMC.R
+# new figure: z_chromosome/figures/Z species ridge all.png
+
+# use one sample two-tail t test to see if percent of Z gene in each evolutionary rate category is different from autosomal distribution
+# Only use chromosomes with more than 26 genes (31 autosomes vs Z). This gets rid of smaller fragments
+# Use R script: 10_sp_CAGEE_IMC.R
+# new ratio figure: CAGEE/global_figures/n_gamma/Z/Percent of genes per sigma category low chromosome_name filter Autosomes sig.png
+# new ratio figure: CAGEE/global_figures/n_gamma/Z/ratio Percent of genes per sigma category low chromosome_name filter Autosomes sig.png
+
+# save results of ttest for both median and ratio incsv: 'CAGEE/global_figures/n_gamma/Z/ngamma_z_stats.csv'
+
+# correct ancestral state by using gamma rates from transcriptome (not Z chromosome gamma rates)
+
+# do we need to compare median rate and M:F rate to ancestral state?
+
+# can also apply ordinal logistic regression of gamma rate ~ ancestral state (log) with funtion 'clm' from package 'ordinal' in r
+# ratio gamma rate ~ ancestral state (log):          
+#         Estimate Std. Error z value Pr(>|z|)
+# log.root  -0.1370     0.4497  -0.305    0.761
+
+# median gamma rate ~ ancestral state (log):   
+#         Estimate Std. Error z value Pr(>|z|)
+# log.root   0.5486     0.4438   1.236    0.216
+
+# neither median gamma rate or ratio gamma rate is significant
+
+#### 10/22/2025
+# Summary: compare k categories
+
+# compare results of k=10, 8, 6, 4
+# both median and ratio
+
+#### 11/04/2025
+# Summary: compare k categories
+
+# add k=2 and use percentage graph
+# Pull sigma values and graph k categories (x-axis) vs sigma rate (y-axis) to match mendes paper
+
+# CAGEE/global_figures/n_gamma/compare/ratio k category flow percent.png
+CAGEE/global_figures/n_gamma/compare/median k category flow percent.png
+
+# bootstrapping across 100 individuals
+# run CAGEE 100 times, randomly pick one individual from each species
+# do 4 parameter model (FA, MA, FZ, MZ)
+# then compare 'confidence interval of each sigma
+
+# saved new data files: CAGEE/data/random/median/
+
+# loop through all 100 and save results: CAGEE/median/median_cagee_outs_random/
+# use inefficient R script to run CAGEE
+
+#### 11/05/2025
+# Summary: results from bootstrap analysis
+
+# compare sigma 95% confidence intervals for 4 parameters (FA, MA, MZ, FZ)
+# save image: CAGEE/global_figures/bootstrap/sex_chrom_4parameter/Compare sigma bootstrap.png
+
+# find that bootstrap rates are higher than median results since median is hiding noise
+# give same pattern of results
+
+
+
+
+
