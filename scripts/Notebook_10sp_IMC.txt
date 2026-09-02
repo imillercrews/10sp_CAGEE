@@ -866,39 +866,69 @@ ratio	4	208585 AvsZ
 
 # neither median gamma rate or ratio gamma rate is significant
 
-#### 10/22/2025
-# Summary: compare k categories
+#### 08/05/2025
+# Summary: create additional figures for paper
 
-# compare results of k=10, 8, 6, 4
-# both median and ratio
+# show median ancestral state gene expression compared to sigma category
+#  t.test of lower expressing genes (ln expression < 5 vs ln expression >= 5) to show that sigma is higher for lower expressing genes
+# Welch Two Sample t-test
+# t = 23.761, df = 7324.1, p-value < 2.2e-16
+# 95 percent confidence interval:
+#  0.004872424 0.005748657
+# sample estimates:
+#   mean of ln(exp) <5: 0.013996499
+#   mean of ln(exp) >=5: 0.008685958
 
-#### 11/04/2025
-# Summary: compare k categories
+# also create mean-variance dispersion plot of log1p normalized gene expression across all samples and all speices 
+# pretty flat (e.g. stabilized) although slightly higher variance for lower expressed genes 
 
-# add k=2 and use percentage graph
-# Pull sigma values and graph k categories (x-axis) vs sigma rate (y-axis) to match mendes paper
+# compare example genes that either:
+# slowest M:F sigma and slowest median sigma
+# slowest M:F sigma and fastest median sigma
+# fastest M:F sigma and slowest median sigma
+# fastest M:F sigma and fastest median sigma
 
-# CAGEE/global_figures/n_gamma/compare/ratio k category flow percent.png
-CAGEE/global_figures/n_gamma/compare/median k category flow percent.png
+# use gene with median expression (ignorning 0)
+# save figure: CAGEE/global_figures/n_gamma/compare/Example genes of high and low sigma.png
 
-# bootstrapping across 100 individuals
-# run CAGEE 100 times, randomly pick one individual from each species
-# do 4 parameter model (FA, MA, FZ, MZ)
-# then compare 'confidence interval of each sigma
+# Proportion of genes below global median expression:
+# Male Z = 46.3%
+# Male A = 50.1%
+# Male 4 = 46.7%
 
-# saved new data files: CAGEE/data/random/median/
+# Female Z = 63.1%
+# Female A = 49.5%
+# Female 4 = 45.7%
 
-# loop through all 100 and save results: CAGEE/median/median_cagee_outs_random/
-# use inefficient R script to run CAGEE
+# Mean expression (ln)
+# Male Z = 6.00
+# Male A = 6.27
+# Male 4 = 6.19
 
-#### 11/05/2025
-# Summary: results from bootstrap analysis
+# Female Z = 5.60
+# Female A = 6.29
+# Female 4 = 6.20
 
-# compare sigma 95% confidence intervals for 4 parameters (FA, MA, MZ, FZ)
-# save image: CAGEE/global_figures/bootstrap/sex_chrom_4parameter/Compare sigma bootstrap.png
+# compare sigma rate between A and Z for high and low expressed genes
+# did t-test between A and Z genes 
+# for Autosome just use genes on chromsome 4
 
-# find that bootstrap rates are higher than median results since median is hiding noise
-# give same pattern of results
+# bottom 50% of A and Z (using mean of the species median expression) 
+# Z has higher median sigma: t = -1.161, df = 426.62, p-value = 0.2463
+
+# top 50% of A and Z (using mean of the species median expression) 
+# no difference in sigma: t = 0.17561, df = 438, p-value = 0.8607
+
+# bottom 50% of A and Z (using mean of the species median expression) 
+# Z has higher ratio sigma: t = -4.9, df = 422.16, p-value = 1.368e-06
+
+# top 50% of A and Z (using mean of the species median expression) 
+# Z has higher ratio sigma: t = -7.5977, df = 288.73, p-value = 4.227e-13
+
+
+
+
+
 
 
 

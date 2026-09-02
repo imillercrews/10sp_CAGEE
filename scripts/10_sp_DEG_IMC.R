@@ -1,9 +1,10 @@
 #### 10 sp bird analysis 
 ### DEG analysis
-# R 4.2.1
+# R 4.3.1
 
 ## setwd
-setwd("/geode2/home/u040/imillerc/Quartz/10_sp")
+# setwd("/geode2/home/u040/imillerc/Quartz/10_sp")
+setwd("/N/project/Snseq_IMC/10_sp")
 
 #### load libraries ####
 library(DESeq2)
@@ -835,6 +836,12 @@ write.csv(top.table,
 top.table = read.csv('DEG/top.table.all.species.csv')
 
 #### graph DEGs all species ####
+# load results
+top.table = read.csv('DEG/top.table.all.species.csv')
+
+## load gene chromosome position
+data.gene.chromosome = read_tsv('Gene_list/10sp_NCBI_ensembl_chromosome_position.tsv')
+
 ## stats
 top.table %>% 
   filter(adj.P.Val < 0.05) %>% 
@@ -904,8 +911,6 @@ ggsave(paste0('DEG/figures/All_sex/volcano_plots/',
 
 
 ### Compare DEG with Z chromosome
-## load gene chromosome position
-data.gene.chromosome = read_tsv('Gene_list/10sp_NCBI_ensembl_chromosome_position.tsv')
 
 ## add Z to all species DEG
 # paper
@@ -917,10 +922,12 @@ top.table %>%
               dplyr::rename(chr = chromosome_name) %>% 
               mutate(chr = ifelse(chr == 'Z',
                                   'Z',
-                                  'A'),
-                     chr = ifelse(is.na(chr),
-                                  'A',
-                                  chr))) %>% 
+                                  'A')
+                     # ,chr = ifelse(is.na(chr),
+                     #              'A',
+                     #              chr)
+            )) %>% 
+  filter(!(is.na(chr))) %>% 
   filter(adj.P.Val < 0.05) %>% 
   mutate(direction = ifelse(logFC > 0,
                             'male_bias',
@@ -944,11 +951,14 @@ top.table %>%
                                    "TS",
                                    "BS"),
                        order = c(1:10))) %>% 
+  mutate(chr.direction = case_when(chr=='Z' ~ 'Z',
+                                   direction=='male_bias' ~ 'M',
+                                   direction=='female_bias' ~ 'F')) %>% 
   ggplot(aes(y = reorder(species,
                          -order),
              x = Freq)) +
   geom_bar(aes(group = chr,
-               fill = chr),
+               fill = chr.direction),
            stat = 'identity',
            # fill = 'lightgrey',
            # color = 'black'
@@ -957,11 +967,15 @@ top.table %>%
   theme_classic(base_size = 8) +
   ylab('Species') +
   xlab('Number of DEGs') +
-  scale_fill_manual(values = c('lightgrey',
-                               'red'))+ 
+  labs(fill = 'Chr') +
+  scale_fill_manual(values = c('F'='grey66',
+                               "Z" = 'red',
+                               'M' = 'black'))+
   theme(legend.position = 'inside',
         legend.position.inside = c(0.9, 
-                            0.5))
+                            0.5),
+    legend.key.size = unit(0.3, "cm"),
+    legend.spacing.y = unit(0.1, "cm"))
 ggsave('DEG/figures/All_sex/Number of DEG per species.pdf',
        height = 3.9,
        width = 3.1,
@@ -1007,10 +1021,12 @@ top.table.upset =
               dplyr::rename(chr = chromosome_name) %>% 
               mutate(chr = ifelse(chr == 'Z',
                                   'Z',
-                                  'A'),
-                     chr = ifelse(is.na(chr),
-                                  'A',
-                                  chr))) %>% 
+                                  'A')
+                    # , chr = ifelse(is.na(chr),
+                    #               'A',
+                    #               chr)
+                     )) %>% 
+  filter(!(is.na(chr))) %>% 
   mutate(sig = ifelse(adj.P.Val < 0.05,
                       1,
                       0)) %>% 
@@ -1034,10 +1050,12 @@ top.table.upset.m =
               dplyr::rename(chr = chromosome_name) %>% 
               mutate(chr = ifelse(chr == 'Z',
                                   'Z',
-                                  'A'),
-                     chr = ifelse(is.na(chr),
-                                  'A',
-                                  chr))) %>% 
+                                  'A')
+                     # ,chr = ifelse(is.na(chr),
+                     #              'A',
+                     #              chr)
+                     )) %>% 
+  filter(!(is.na(chr))) %>% 
   mutate(sig = ifelse(adj.P.Val < 0.05,
                       1,
                       0),
@@ -1063,10 +1081,12 @@ top.table.upset.f =
               dplyr::rename(chr = chromosome_name) %>% 
               mutate(chr = ifelse(chr == 'Z',
                                   'Z',
-                                  'A'),
-                     chr = ifelse(is.na(chr),
-                                  'A',
-                                  chr))) %>% 
+                                  'A')
+                     # ,chr = ifelse(is.na(chr),
+                     #              'A',
+                     #              chr)
+                     )) %>% 
+  filter(!(is.na(chr))) %>% 
   mutate(sig = ifelse(adj.P.Val < 0.05,
                       1,
                       0),
@@ -1146,11 +1166,11 @@ species.list = top.table %>%
 
 # males
 # paper
-png('DEG/figures/All_sex/upset/Male DEGs upset vs Z.png',
+pdf('DEG/figures/All_sex/upset/Male DEGs upset vs Z.pdf',
     height = 7,
     width = 10.85,
-    units = 'in',
-    res = 320,
+    # units = 'in',
+    # res = 320,
     pointsize = 24)
 upset(top.table.upset.m,
       species.list,
@@ -1179,11 +1199,12 @@ upset(top.table.upset.m,
 dev.off()
 
 # female only DEGs
-png('DEG/figures/All_sex/upset/Female DEGs upset vs Z.png',
+pdf('DEG/figures/All_sex/upset/Female DEGs upset vs Z.pdf',
     height = 7,
     width = 10.85,
-    units = 'in',
-    res = 320)
+    # units = 'in',
+    # res = 320
+    )
 upset(top.table.upset.f,
       species.list,
       min_size = 4,
@@ -1192,7 +1213,7 @@ upset(top.table.upset.f,
           # counts=FALSE,
           mapping=aes(fill = chr)
         ) + scale_fill_manual(values = c(
-          'A'='black',
+          'A'='grey66',
           'Z'='red'
         ), guide = 'none')
       ),
@@ -1203,16 +1224,113 @@ upset(top.table.upset.f,
           geom = geom_bar(
             aes(fill = chr)) 
         )+ scale_fill_manual(values = c(
-          'A'='black',
+          'A'='grey66',
           'Z'='red'
         ),
         guide = 'none')
       ))
 dev.off()
 
+## graph number of species specific sex-biased genes
+top.table.species.overlap = top.table.upset.f %>%
+  mutate(species.deg = rowSums(pick(where(is.numeric))),
+         deg.sex = 'F') %>% 
+  dplyr::select(GeneName,
+                chr,
+                deg.sex,
+                species.deg) %>% 
+  rbind(top.table.upset.m %>%
+          mutate(species.deg = rowSums(pick(where(is.numeric))),
+                 deg.sex = 'M') %>% 
+          dplyr::select(GeneName,
+                        chr,
+                        deg.sex,
+                        species.deg)) 
 
 
 
+# graph species-specific
+# autosomes
+top.table.species.overlap %>% 
+  group_by(chr,
+           deg.sex,
+           species.deg) %>% 
+  summarise(species.deg.count = n()) %>% 
+  ungroup() %>% 
+  complete(chr,
+           deg.sex, 
+           species.deg,
+           fill = list(species.deg.count = 0)) %>% 
+  filter(chr == 'A') %>% 
+  ggplot(aes(x = species.deg,
+             y = species.deg.count,
+             fill = deg.sex,
+             group = deg.sex)) +
+  geom_bar(stat = 'identity',
+           position = position_dodge(width = 0.9)) +
+  theme_classic() +
+  scale_fill_manual(values=c('M' = 'black',
+                             'F' = 'grey66')) +
+  xlab('Presence across presence') +
+  ylab('Number of DEGs')+
+  labs(fill = 'Sex') +
+  scale_x_continuous(breaks = scales::breaks_width(1)) +
+  theme(legend.position = 'inside',
+        legend.position.inside = c(0.9,0.5))
+ggsave('DEG/figures/All_sex/Overlap of DEG per species all groups.pdf',
+       height = 4,
+       width = 3.2,
+       units = 'in',
+       dpi = 720)
+
+# group by specific or not
+top.table.species.overlap %>% 
+  mutate(species.deg.group = case_when(species.deg == 1 ~ 'species-specific',
+                                       species.deg > 1 &  species.deg < 10 ~ 'species >= 2 ',
+                                       species.deg == 10 ~ 'All species')) %>% 
+  group_by(chr,
+           deg.sex,
+           species.deg.group) %>% 
+  summarise(species.deg.count = n()) %>% 
+  ungroup() %>% 
+  # complete(chr,
+  #          deg.sex, 
+  #          species.deg.group,
+  #          fill = list(species.deg.count = 0)) %>% 
+  filter(chr == 'A') %>% 
+  ggplot(aes(x = reorder(species.deg.group,
+                         desc(species.deg.count)),
+             y = species.deg.count,
+             fill = deg.sex,
+             group = deg.sex)) +
+  geom_bar(stat = 'identity',
+           position = position_dodge(width = 0.9)) +
+  theme_classic() +
+  scale_fill_manual(values=c('M' = 'black',
+                             'F' = 'grey66')) +
+  theme(axis.text.x = element_text(angle = 45,
+                                   hjust = 1))+
+  xlab('') +
+  ylab('Number of DEGs')+
+  labs(fill = 'Sex')  +
+  theme(legend.position = 'inside',
+        legend.position.inside = c(0.9,0.5))
+ggsave('DEG/figures/All_sex/Overlap of DEG per species.pdf',
+       height = 4,
+       width = 3.2,
+       units = 'in',
+       dpi = 720)
+
+# get list of consistently sex-biased genes
+top.table.species.overlap %>% View()
+  mutate(species.deg.group = case_when(species.deg == 1 ~ 'species-specific',
+                                       species.deg > 1 &  species.deg < 10 ~ 'species >= 2 ',
+                                       species.deg == 10 ~ 'All species')) %>% 
+  dplyr::count(chr, 
+               species.deg)
+  
+
+  
 
 # #### RRHO2 ####
 # ## compare concordance between all pairs of clades

@@ -5,7 +5,9 @@
 ## help making trees: yulab-smu.top/treedata-book/
 
 ## setwd
-setwd("/geode2/home/u040/imillerc/Quartz/10_sp")
+# setwd("/geode2/home/u040/imillerc/Quartz/10_sp")
+# setwd('/N/slate/imillerc/10_sp_06192025/')
+setwd("/N/project/Snseq_IMC/10_sp")
 
 #### load libraries ####
 library(ape)
@@ -14,7 +16,7 @@ library(ggtree)
 library(tidyverse)
 library(gghalves)
 #### convert counts file to CAGEE input file ####
-### load gene chromesome position
+### load gene chromosome position
 data.gene.chromosome = read_tsv('Gene_list/10sp_NCBI_ensembl_chromosome_position.tsv')
 
 ### load normalized counts file
@@ -56,6 +58,18 @@ sample_ids = sample_ids %>%
                            1,
                            2)
   )
+
+## check normalization dispersion
+# use log1p correction like cagee
+data.vsn = data %>% 
+column_to_rownames('GeneName') %>% 
+  dplyr::select(c(sample_ids %>% 
+                    pull(sample_name))) %>% 
+  as.matrix() %>% 
+  log1p()
+
+# # graph mean-variance dispersion
+# vsn::meanSdPlot(data.vsn)
 
 ### calculate median for every gene in each sex in each species 
 ## create long format dataframe
@@ -114,6 +128,85 @@ data.long.median.sp = data.long %>%
   group_by(species) %>% 
   summarize_if(is.numeric,
                median)
+
+## check normalization dispersion
+# use log1p correction like cagee
+data.long.median.sp.vsn = data.long.median.sp %>% 
+  column_to_rownames('species') %>% 
+  as.matrix() %>% 
+  t() %>% 
+  log1p()
+
+# graph mean-variance dispersion
+png('CAGEE/global_figures/Species median mean rank variance dispersion plot.png')
+vsn::meanSdPlot(data.long.median.sp.vsn)
+dev.off()
+
+
+# create own mean-variance plot
+data.long.median.sp %>% 
+  column_to_rownames('species') %>% 
+  as.matrix() %>% 
+  t() %>% 
+  log1p() %>%
+  as.data.frame() %>%
+  mutate(mean = rowMeans(pick(everything()), na.rm=T),
+         sd = matrixStats::rowSds(as.matrix(pick(everything()), na.rm=T))
+         # ,mean = rank(mean, 
+         #             ties.method = "average")
+         ) %>% 
+  ggplot(aes(x = mean,
+             y = sd)) +
+  geom_hex(bins = 50) +
+  geom_smooth(method = "loess",
+              color = "red", 
+              se = FALSE, 
+              size = 1) +
+  xlab('mean') +
+  geom_vline(xintercept = log1p(10),
+             linetype = 'dashed',
+             color = 'grey')+
+  geom_vline(xintercept = log1p(100),
+             linetype = 'dashed',
+             color = 'grey')+
+  geom_vline(xintercept = log1p(1000),
+             linetype = 'dashed',
+             color = 'grey') +
+  geom_vline(xintercept = log1p(10000),
+             linetype = 'dashed',
+             color = 'grey') 
+ggsave('CAGEE/global_figures/Species median mean variance dispersion plot.pdf',
+       height = 5,
+       width = 6.4,
+       units = 'in',
+       dpi = 720)
+
+# rank
+data.long.median.sp %>% 
+  column_to_rownames('species') %>% 
+  as.matrix() %>% 
+  t() %>% 
+  log1p() %>%
+  as.data.frame() %>%
+  mutate(mean = rowMeans(pick(everything()), na.rm=T),
+         sd = matrixStats::rowSds(as.matrix(pick(everything()), na.rm=T))
+         ,mean = rank(mean,
+                     ties.method = "average")
+  ) %>% 
+  ggplot(aes(x = mean,
+             y = sd)) +
+  geom_hex(bins = 50) +
+  geom_smooth(method = "loess",
+              color = "red", 
+              se = FALSE, 
+              size = 1) +
+  xlab('rank(mean)') 
+ggsave('CAGEE/global_figures/Species median mean variance dispersion plot rank.pdf',
+       height = 5,
+       width = 6.4,
+       units = 'in',
+       dpi = 720)
+
 
 # convert to true long
 data.long.median.sp = data.long.median.sp %>% 
@@ -177,6 +270,17 @@ data.gene.chromosome.z = data.gene.chromosome %>%
   dplyr::select(-c(chromosome_name)) %>% 
   dplyr::rename(GeneName = Symbol)
 
+# just keep chromsome 4
+data.gene.chromosome.z4 = data.gene.chromosome %>% 
+  dplyr::select(Symbol,
+                chromosome_name) %>% 
+  mutate(SAMPLETYPE = case_when(chromosome_name == 'Z' ~ 'Z',
+                                chromosome_name == 4 ~ 'A',
+                                TRUE ~ NA)) %>%
+  na.omit() %>% 
+  dplyr::select(-c(chromosome_name)) %>% 
+  dplyr::rename(GeneName = Symbol)
+
 ## add z chromosome to other data frames
 # ratio
 data.wide.format.z = data.wide.format %>% 
@@ -203,6 +307,47 @@ data.wide.format.median.z = data.wide.format.median %>%
   relocate(GeneName) %>% 
   relocate(GeneDescription) 
 
+# check expression of Z vs Auto
+# graph
+data.wide.format.median.z %>% 
+  mutate(row_mean = rowMeans(across(where(is.numeric)), na.rm = TRUE)) %>%
+  separate_wider_position(SAMPLETYPE,
+                          widths = c(Sex = 1,
+                                     Chr = 1),
+                          cols_remove = F) %>% 
+  ggplot(aes(x = log(row_mean),
+             group = Chr,
+             fill = Chr)) +
+  geom_histogram(bins = 100) +
+  geom_vline(xintercept = 5.325888) +
+  theme_classic() +
+  facet_grid(~Sex) +
+  scale_fill_manual(values = c('A' = 'grey',
+                               'Z' = 'darkred')) +
+  xlab('Mean expression across species (ln)')
+ggsave('CAGEE/global_figures/Z vs A expression and sex.png')
+
+# get proportion below average
+data.wide.format.median.z %>% 
+  mutate(row_mean = rowMeans(across(where(is.numeric)), na.rm = TRUE),
+         keep = ifelse(log(row_mean) < 5.325888,
+                       'below.mean',
+                       'above.mean')) %>%
+  dplyr::count(SAMPLETYPE,
+               keep) %>% 
+  pivot_wider(names_from = 'keep',
+              values_from = "n") %>% 
+  mutate(propotion.below = 100*below.mean/(below.mean+above.mean)) %>% 
+  dplyr::select(SAMPLETYPE,
+                propotion.below)
+
+# average per type
+data.wide.format.median.z %>% 
+  mutate(row_mean = rowMeans(across(where(is.numeric)), na.rm = TRUE)) %>% 
+  group_by(SAMPLETYPE) %>% 
+  summarise(mean = log(mean(row_mean)))
+  
+
 # median species
 data.wide.format.median.sp.z = data.wide.format.median.sp %>% 
   left_join(data.gene.chromosome.z) %>% 
@@ -212,6 +357,75 @@ data.wide.format.median.sp.z = data.wide.format.median.sp %>%
   relocate(SAMPLETYPE) %>% 
   relocate(GeneName) %>% 
   relocate(GeneDescription) 
+
+## compare Z to similar sized chromsome 4
+# add z chromosome to other data frames
+# ratio
+data.wide.format.z4 = data.wide.format %>% 
+  left_join(data.gene.chromosome.z4) %>% 
+  na.omit() %>% 
+  relocate(SAMPLETYPE) %>% 
+  relocate(GeneName) %>% 
+  relocate(GeneDescription) 
+
+# median sex and species 
+# combine sex and chromosome
+data.wide.format.median.z4 = data.wide.format.median %>% 
+  left_join(data.gene.chromosome.z4 %>% 
+              rename(SAMPLETYPE.Z = SAMPLETYPE)) %>% 
+  na.omit() %>% 
+  mutate(SAMPLETYPE = paste0(SAMPLETYPE,
+                             SAMPLETYPE.Z)) %>% 
+  select(-c(SAMPLETYPE.Z)) %>% 
+  relocate(SAMPLETYPE) %>% 
+  relocate(GeneName) %>% 
+  relocate(GeneDescription) 
+
+# check expression of Z vs Auto
+# graph
+data.wide.format.median.z4 %>% 
+  mutate(row_mean = rowMeans(across(where(is.numeric)), na.rm = TRUE)) %>%
+  separate_wider_position(SAMPLETYPE,
+                          widths = c(Sex = 1,
+                                     Chr = 1),
+                          cols_remove = F) %>% 
+  mutate(Chr = ifelse(Chr != 'Z',
+                      '4',
+                      Chr)) %>% 
+  ggplot(aes(x = log(row_mean),
+             group = Chr,
+             fill = Chr)) +
+  geom_histogram(bins = 100) +
+  geom_vline(xintercept = 5.312591) +
+  theme_classic() +
+  facet_grid(~Sex) +
+  scale_fill_manual(values = c('4' = 'grey',
+                               'Z' = 'darkred')) +
+  xlab('Mean expression across species (ln)')
+ggsave('CAGEE/global_figures/Z vs chr 4 expression and sex.pdf',
+       height = 5,
+       width = 6.4,
+       dpi = 720)
+
+# get proportion below average
+data.wide.format.median.z4 %>% 
+  mutate(row_mean = rowMeans(across(where(is.numeric)), na.rm = TRUE),
+         keep = ifelse(log(row_mean) < 5.325888,
+                       'below.mean',
+                       'above.mean')) %>%
+  dplyr::count(SAMPLETYPE,
+               keep) %>% 
+  pivot_wider(names_from = 'keep',
+              values_from = "n") %>% 
+  mutate(propotion.below = 100*below.mean/(below.mean+above.mean)) %>% 
+  dplyr::select(SAMPLETYPE,
+                propotion.below)
+
+# average per type
+data.wide.format.median.z4 %>% 
+  mutate(row_mean = rowMeans(across(where(is.numeric)), na.rm = TRUE)) %>% 
+  group_by(SAMPLETYPE) %>% 
+  summarise(mean = log(mean(row_mean)))
 
 ## create random chromosomes for testing ratio data
 # remove Z genes 
@@ -3429,335 +3643,335 @@ write_tsv(ngamma_sim_gene_ratio_large,
 
 
 
-#### load n_gamma_cats data ####
-# remove NA
-# pivot long
-# only keep category with the top liklihood score per gene
+#### OLD: load n_gamma_cats data ####
+# # remove NA
+# # pivot long
+# # only keep category with the top liklihood score per gene
+# 
+# #### 4 categories
+# ### simulation
+# ## median
+# # 4 categories 
+# ngamma_median_4_sim = read_tsv('CAGEE/n_gamma_simulation/median_sim_100_cagee_outs_n_gamma_cats//category_likelihoods.txt') %>% 
+#   select(-c('...6')) %>% 
+#   rename(transcript = "Transcript ID") %>% 
+#   pivot_longer(cols = -c(transcript),
+#                values_to = "liklihood",
+#                names_to = 'gamma.cat') %>% 
+#   mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
+#   group_by(transcript) %>%
+#   mutate(top.cat = max(liklihood)) %>% 
+#   ungroup() %>% 
+#   mutate(keep = ifelse(top.cat == liklihood,
+#                        1,
+#                        0)) %>% 
+#   filter(keep == 1) %>% 
+#   mutate(type = 'median',
+#          gene.list = 'sim',
+#          gamma.count = 4) 
+# 
+# # large sigma
+# ngamma_median_4_sim_large = read_tsv('CAGEE/n_gamma_simulation/median_sim_100_large_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
+#   select(-c('...6')) %>% 
+#   rename(transcript = "Transcript ID") %>% 
+#   pivot_longer(cols = -c(transcript),
+#                values_to = "liklihood",
+#                names_to = 'gamma.cat') %>% 
+#   mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
+#   group_by(transcript) %>%
+#   mutate(top.cat = max(liklihood)) %>% 
+#   ungroup() %>% 
+#   mutate(keep = ifelse(top.cat == liklihood,
+#                        1,
+#                        0)) %>% 
+#   filter(keep == 1) %>% 
+#   mutate(type = 'median',
+#          gene.list = 'sim.large',
+#          gamma.count = 4) 
+# 
+# ## ratio
+# # 4 categories 
+# ngamma_ratio_4_sim = read_tsv('CAGEE/n_gamma_simulation/ratio_sim_100_cagee_outs_n_gamma_cats//category_likelihoods.txt') %>% 
+#   select(-c('...6')) %>% 
+#   rename(transcript = "Transcript ID") %>% 
+#   pivot_longer(cols = -c(transcript),
+#                values_to = "liklihood",
+#                names_to = 'gamma.cat') %>% 
+#   mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
+#   group_by(transcript) %>%
+#   mutate(top.cat = max(liklihood)) %>% 
+#   ungroup() %>% 
+#   mutate(keep = ifelse(top.cat == liklihood,
+#                        1,
+#                        0)) %>% 
+#   filter(keep == 1) %>% 
+#   mutate(type = 'ratio',
+#          gene.list = 'sim',
+#          gamma.count = 4) 
+# 
+# # large sigma
+# ngamma_ratio_4_sim_large = read_tsv('CAGEE/n_gamma_simulation/ratio_sim_100_large_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
+#   select(-c('...6')) %>% 
+#   rename(transcript = "Transcript ID") %>% 
+#   pivot_longer(cols = -c(transcript),
+#                values_to = "liklihood",
+#                names_to = 'gamma.cat') %>% 
+#   mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
+#   group_by(transcript) %>%
+#   mutate(top.cat = max(liklihood)) %>% 
+#   ungroup() %>% 
+#   mutate(keep = ifelse(top.cat == liklihood,
+#                        1,
+#                        0)) %>% 
+#   filter(keep == 1) %>% 
+#   mutate(type = 'ratio',
+#          gene.list = 'sim.large',
+#          gamma.count = 4) 
+# 
+# ### transcriptome
+# ## median
+# # 4 categories 
+# ngamma_median_4 = read_tsv('CAGEE/median/median_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
+#   select(-c('...6')) %>% 
+#   rename(transcript = "Transcript ID") %>% 
+#   pivot_longer(cols = -c(transcript),
+#                values_to = "liklihood",
+#                names_to = 'gamma.cat') %>% 
+#   mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
+#   group_by(transcript) %>%
+#   mutate(top.cat = max(liklihood)) %>% 
+#   ungroup() %>% 
+#   mutate(keep = ifelse(top.cat == liklihood,
+#                        1,
+#                        0)) %>% 
+#   filter(keep == 1) %>% 
+#   mutate(type = 'median',
+#          gene.list = 'all',
+#          gamma.count = 4) 
+# 
+# ## ratio
+# # 4 categories 
+# ngamma_ratio_4 = read_tsv('CAGEE/ratio/ratio_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
+#   select(-c('...6')) %>% 
+#   rename(transcript = "Transcript ID") %>% 
+#   pivot_longer(cols = -c(transcript),
+#                values_to = "liklihood",
+#                names_to = 'gamma.cat') %>% 
+#   mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
+#   group_by(transcript) %>%
+#   mutate(top.cat = max(liklihood)) %>% 
+#   ungroup() %>% 
+#   mutate(keep = ifelse(top.cat == liklihood,
+#                        1,
+#                        0)) %>% 
+#   filter(keep == 1) %>% 
+#   mutate(type = 'ratio',
+#          gene.list = 'all',
+#          gamma.count = 4)
+# 
+# ### Z chromosome
+# ## median
+# # 4 categories 
+# ngamma_median_z_4 = read_tsv('CAGEE/median_z/median_z_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
+#   select(-c('...6')) %>% 
+#   rename(transcript = "Transcript ID") %>% 
+#   pivot_longer(cols = -c(transcript),
+#                values_to = "liklihood",
+#                names_to = 'gamma.cat') %>% 
+#   mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
+#   group_by(transcript) %>%
+#   mutate(top.cat = max(liklihood)) %>% 
+#   ungroup() %>% 
+#   mutate(keep = ifelse(top.cat == liklihood,
+#                        1,
+#                        0)) %>% 
+#   filter(keep == 1) %>% 
+#   mutate(type = 'median',
+#          gene.list = 'Z',
+#          gamma.count = 4)
+# 
+# 
+# ## ratio
+# # 4 categories 
+# ngamma_ratio_z_4 = read_tsv('CAGEE/ratio/ratio_z_cagee_outs_n_gamma_cats/category_likelihoods.txt')%>% 
+#   select(-c('...6')) %>% 
+#   rename(transcript = "Transcript ID") %>% 
+#   pivot_longer(cols = -c(transcript),
+#                values_to = "liklihood",
+#                names_to = 'gamma.cat') %>% 
+#   mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
+#   group_by(transcript) %>%
+#   mutate(top.cat = max(liklihood)) %>% 
+#   ungroup() %>% 
+#   mutate(keep = ifelse(top.cat == liklihood,
+#                        1,
+#                        0)) %>% 
+#   filter(keep == 1) %>% 
+#   mutate(type = 'ratio',
+#          gene.list = 'Z',
+#          gamma.count = 4)
+# 
+# #### 10 categories
+# ### transcriptome
+# ## median
+# # 10 categories 
+# ngamma_median_10 = read_tsv('CAGEE/median/median_cagee_outs_n_gamma_cats_10/category_likelihoods.txt') %>% 
+#   select(-c('...12')) %>% 
+#   rename(transcript = "Transcript ID") %>% 
+#   pivot_longer(cols = -c(transcript),
+#                values_to = "liklihood",
+#                names_to = 'gamma.cat') %>% 
+#   mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
+#   group_by(transcript) %>%
+#   mutate(top.cat = max(liklihood)) %>% 
+#   ungroup() %>% 
+#   mutate(keep = ifelse(top.cat == liklihood,
+#                        1,
+#                        0)) %>% 
+#   filter(keep == 1) %>% 
+#   mutate(type = 'median',
+#          gene.list = 'all',
+#          gamma.count = 10) 
+# 
+# ## ratio
+# # 10 categories 
+# ngamma_ratio_10 = read_tsv('CAGEE/ratio/ratio_cagee_outs_n_gamma_cats_10/category_likelihoods.txt') %>% 
+#   select(-c('...12')) %>% 
+#   rename(transcript = "Transcript ID") %>% 
+#   pivot_longer(cols = -c(transcript),
+#                values_to = "liklihood",
+#                names_to = 'gamma.cat') %>% 
+#   mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
+#   group_by(transcript) %>%
+#   mutate(top.cat = max(liklihood)) %>% 
+#   ungroup() %>% 
+#   mutate(keep = ifelse(top.cat == liklihood,
+#                        1,
+#                        0)) %>% 
+#   filter(keep == 1) %>% 
+#   mutate(type = 'ratio',
+#          gene.list = 'all',
+#          gamma.count = 10)
+# 
+# ### Z chromosome
+# ## median
+# # 10 categories 
+# ngamma_median_z_10 = read_tsv('CAGEE/median_z/median_z_cagee_outs_n_gamma_cats_10/category_likelihoods.txt') %>% 
+#   select(-c('...12')) %>% 
+#   rename(transcript = "Transcript ID") %>% 
+#   pivot_longer(cols = -c(transcript),
+#                values_to = "liklihood",
+#                names_to = 'gamma.cat') %>% 
+#   mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
+#   group_by(transcript) %>%
+#   mutate(top.cat = max(liklihood)) %>% 
+#   ungroup() %>% 
+#   mutate(keep = ifelse(top.cat == liklihood,
+#                        1,
+#                        0)) %>% 
+#   filter(keep == 1) %>% 
+#   mutate(type = 'median',
+#          gene.list = 'Z',
+#          gamma.count = 10)
+# 
+# 
+# ## ratio
+# # 10 categories 
+# ngamma_ratio_z_10 = read_tsv('CAGEE/ratio/ratio_z_cagee_outs_n_gamma_cats_10/category_likelihoods.txt')%>% 
+#   select(-c('...12')) %>% 
+#   rename(transcript = "Transcript ID") %>% 
+#   pivot_longer(cols = -c(transcript),
+#                values_to = "liklihood",
+#                names_to = 'gamma.cat') %>% 
+#   mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
+#   group_by(transcript) %>%
+#   mutate(top.cat = max(liklihood)) %>% 
+#   ungroup() %>% 
+#   mutate(keep = ifelse(top.cat == liklihood,
+#                        1,
+#                        0)) %>% 
+#   filter(keep == 1) %>% 
+#   mutate(type = 'ratio',
+#          gene.list = 'Z',
+#          gamma.count = 10)
+# 
+# ### combine into one data frame
+# ngamma.df = rbind(ngamma_median_4,
+#                   ngamma_ratio_4) %>% 
+#   rbind(ngamma_median_z_4) %>% 
+#   rbind(ngamma_ratio_z_4) %>% 
+#   rbind(ngamma_median_10) %>% 
+#   rbind(ngamma_ratio_10) %>% 
+#   rbind(ngamma_median_z_10) %>% 
+#   rbind(ngamma_ratio_z_10) %>% 
+#   rbind(ngamma_median_4_sim) %>% 
+#   rbind(ngamma_ratio_4_sim) %>% 
+#   rbind(ngamma_ratio_4_sim_large) %>% 
+#   rbind(ngamma_median_4_sim_large)
+# 
+# ## get count of genes per gamma category per type, gene.list, and gamma.count
+# # calculate percentage
+# ngamma.df.table = ngamma.df %>% 
+#   select(-c(transcript,
+#             liklihood,
+#             keep,
+#             top.cat)) %>% 
+#   table() %>% 
+#   as.data.frame() %>% 
+#   mutate(gamma.cat = as.numeric(as.character(gamma.cat))) %>% 
+#   filter(Freq > 0) %>% 
+#   group_by(type,
+#            gene.list,
+#            gamma.count) %>% 
+#   mutate(total = sum(Freq)) %>% 
+#   ungroup() %>% 
+#   mutate(percent = 100*Freq/total)
 
-#### 4 categories
-### simulation
-## median
-# 4 categories 
-ngamma_median_4_sim = read_tsv('CAGEE/n_gamma_simulation/median_sim_100_cagee_outs_n_gamma_cats//category_likelihoods.txt') %>% 
-  select(-c('...6')) %>% 
-  rename(transcript = "Transcript ID") %>% 
-  pivot_longer(cols = -c(transcript),
-               values_to = "liklihood",
-               names_to = 'gamma.cat') %>% 
-  mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
-  group_by(transcript) %>%
-  mutate(top.cat = max(liklihood)) %>% 
-  ungroup() %>% 
-  mutate(keep = ifelse(top.cat == liklihood,
-                       1,
-                       0)) %>% 
-  filter(keep == 1) %>% 
-  mutate(type = 'median',
-         gene.list = 'sim',
-         gamma.count = 4) 
-
-# large sigma
-ngamma_median_4_sim_large = read_tsv('CAGEE/n_gamma_simulation/median_sim_100_large_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
-  select(-c('...6')) %>% 
-  rename(transcript = "Transcript ID") %>% 
-  pivot_longer(cols = -c(transcript),
-               values_to = "liklihood",
-               names_to = 'gamma.cat') %>% 
-  mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
-  group_by(transcript) %>%
-  mutate(top.cat = max(liklihood)) %>% 
-  ungroup() %>% 
-  mutate(keep = ifelse(top.cat == liklihood,
-                       1,
-                       0)) %>% 
-  filter(keep == 1) %>% 
-  mutate(type = 'median',
-         gene.list = 'sim.large',
-         gamma.count = 4) 
-
-## ratio
-# 4 categories 
-ngamma_ratio_4_sim = read_tsv('CAGEE/n_gamma_simulation/ratio_sim_100_cagee_outs_n_gamma_cats//category_likelihoods.txt') %>% 
-  select(-c('...6')) %>% 
-  rename(transcript = "Transcript ID") %>% 
-  pivot_longer(cols = -c(transcript),
-               values_to = "liklihood",
-               names_to = 'gamma.cat') %>% 
-  mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
-  group_by(transcript) %>%
-  mutate(top.cat = max(liklihood)) %>% 
-  ungroup() %>% 
-  mutate(keep = ifelse(top.cat == liklihood,
-                       1,
-                       0)) %>% 
-  filter(keep == 1) %>% 
-  mutate(type = 'ratio',
-         gene.list = 'sim',
-         gamma.count = 4) 
-
-# large sigma
-ngamma_ratio_4_sim_large = read_tsv('CAGEE/n_gamma_simulation/ratio_sim_100_large_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
-  select(-c('...6')) %>% 
-  rename(transcript = "Transcript ID") %>% 
-  pivot_longer(cols = -c(transcript),
-               values_to = "liklihood",
-               names_to = 'gamma.cat') %>% 
-  mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
-  group_by(transcript) %>%
-  mutate(top.cat = max(liklihood)) %>% 
-  ungroup() %>% 
-  mutate(keep = ifelse(top.cat == liklihood,
-                       1,
-                       0)) %>% 
-  filter(keep == 1) %>% 
-  mutate(type = 'ratio',
-         gene.list = 'sim.large',
-         gamma.count = 4) 
-
-### transcriptome
-## median
-# 4 categories 
-ngamma_median_4 = read_tsv('CAGEE/median/median_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
-  select(-c('...6')) %>% 
-  rename(transcript = "Transcript ID") %>% 
-  pivot_longer(cols = -c(transcript),
-               values_to = "liklihood",
-               names_to = 'gamma.cat') %>% 
-  mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
-  group_by(transcript) %>%
-  mutate(top.cat = max(liklihood)) %>% 
-  ungroup() %>% 
-  mutate(keep = ifelse(top.cat == liklihood,
-                       1,
-                       0)) %>% 
-  filter(keep == 1) %>% 
-  mutate(type = 'median',
-         gene.list = 'all',
-         gamma.count = 4) 
-
-## ratio
-# 4 categories 
-ngamma_ratio_4 = read_tsv('CAGEE/ratio/ratio_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
-  select(-c('...6')) %>% 
-  rename(transcript = "Transcript ID") %>% 
-  pivot_longer(cols = -c(transcript),
-               values_to = "liklihood",
-               names_to = 'gamma.cat') %>% 
-  mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
-  group_by(transcript) %>%
-  mutate(top.cat = max(liklihood)) %>% 
-  ungroup() %>% 
-  mutate(keep = ifelse(top.cat == liklihood,
-                       1,
-                       0)) %>% 
-  filter(keep == 1) %>% 
-  mutate(type = 'ratio',
-         gene.list = 'all',
-         gamma.count = 4)
-
-### Z chromosome
-## median
-# 4 categories 
-ngamma_median_z_4 = read_tsv('CAGEE/median_z/median_z_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
-  select(-c('...6')) %>% 
-  rename(transcript = "Transcript ID") %>% 
-  pivot_longer(cols = -c(transcript),
-               values_to = "liklihood",
-               names_to = 'gamma.cat') %>% 
-  mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
-  group_by(transcript) %>%
-  mutate(top.cat = max(liklihood)) %>% 
-  ungroup() %>% 
-  mutate(keep = ifelse(top.cat == liklihood,
-                       1,
-                       0)) %>% 
-  filter(keep == 1) %>% 
-  mutate(type = 'median',
-         gene.list = 'Z',
-         gamma.count = 4)
-
-
-## ratio
-# 4 categories 
-ngamma_ratio_z_4 = read_tsv('CAGEE/ratio/ratio_z_cagee_outs_n_gamma_cats/category_likelihoods.txt')%>% 
-  select(-c('...6')) %>% 
-  rename(transcript = "Transcript ID") %>% 
-  pivot_longer(cols = -c(transcript),
-               values_to = "liklihood",
-               names_to = 'gamma.cat') %>% 
-  mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
-  group_by(transcript) %>%
-  mutate(top.cat = max(liklihood)) %>% 
-  ungroup() %>% 
-  mutate(keep = ifelse(top.cat == liklihood,
-                       1,
-                       0)) %>% 
-  filter(keep == 1) %>% 
-  mutate(type = 'ratio',
-         gene.list = 'Z',
-         gamma.count = 4)
-
-#### 10 categories
-### transcriptome
-## median
-# 10 categories 
-ngamma_median_10 = read_tsv('CAGEE/median/median_cagee_outs_n_gamma_cats_10/category_likelihoods.txt') %>% 
-  select(-c('...12')) %>% 
-  rename(transcript = "Transcript ID") %>% 
-  pivot_longer(cols = -c(transcript),
-               values_to = "liklihood",
-               names_to = 'gamma.cat') %>% 
-  mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
-  group_by(transcript) %>%
-  mutate(top.cat = max(liklihood)) %>% 
-  ungroup() %>% 
-  mutate(keep = ifelse(top.cat == liklihood,
-                       1,
-                       0)) %>% 
-  filter(keep == 1) %>% 
-  mutate(type = 'median',
-         gene.list = 'all',
-         gamma.count = 10) 
-
-## ratio
-# 10 categories 
-ngamma_ratio_10 = read_tsv('CAGEE/ratio/ratio_cagee_outs_n_gamma_cats_10/category_likelihoods.txt') %>% 
-  select(-c('...12')) %>% 
-  rename(transcript = "Transcript ID") %>% 
-  pivot_longer(cols = -c(transcript),
-               values_to = "liklihood",
-               names_to = 'gamma.cat') %>% 
-  mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
-  group_by(transcript) %>%
-  mutate(top.cat = max(liklihood)) %>% 
-  ungroup() %>% 
-  mutate(keep = ifelse(top.cat == liklihood,
-                       1,
-                       0)) %>% 
-  filter(keep == 1) %>% 
-  mutate(type = 'ratio',
-         gene.list = 'all',
-         gamma.count = 10)
-
-### Z chromosome
-## median
-# 10 categories 
-ngamma_median_z_10 = read_tsv('CAGEE/median_z/median_z_cagee_outs_n_gamma_cats_10/category_likelihoods.txt') %>% 
-  select(-c('...12')) %>% 
-  rename(transcript = "Transcript ID") %>% 
-  pivot_longer(cols = -c(transcript),
-               values_to = "liklihood",
-               names_to = 'gamma.cat') %>% 
-  mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
-  group_by(transcript) %>%
-  mutate(top.cat = max(liklihood)) %>% 
-  ungroup() %>% 
-  mutate(keep = ifelse(top.cat == liklihood,
-                       1,
-                       0)) %>% 
-  filter(keep == 1) %>% 
-  mutate(type = 'median',
-         gene.list = 'Z',
-         gamma.count = 10)
-
-
-## ratio
-# 10 categories 
-ngamma_ratio_z_10 = read_tsv('CAGEE/ratio/ratio_z_cagee_outs_n_gamma_cats_10/category_likelihoods.txt')%>% 
-  select(-c('...12')) %>% 
-  rename(transcript = "Transcript ID") %>% 
-  pivot_longer(cols = -c(transcript),
-               values_to = "liklihood",
-               names_to = 'gamma.cat') %>% 
-  mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
-  group_by(transcript) %>%
-  mutate(top.cat = max(liklihood)) %>% 
-  ungroup() %>% 
-  mutate(keep = ifelse(top.cat == liklihood,
-                       1,
-                       0)) %>% 
-  filter(keep == 1) %>% 
-  mutate(type = 'ratio',
-         gene.list = 'Z',
-         gamma.count = 10)
-
-### combine into one data frame
-ngamma.df = rbind(ngamma_median_4,
-                  ngamma_ratio_4) %>% 
-  rbind(ngamma_median_z_4) %>% 
-  rbind(ngamma_ratio_z_4) %>% 
-  rbind(ngamma_median_10) %>% 
-  rbind(ngamma_ratio_10) %>% 
-  rbind(ngamma_median_z_10) %>% 
-  rbind(ngamma_ratio_z_10) %>% 
-  rbind(ngamma_median_4_sim) %>% 
-  rbind(ngamma_ratio_4_sim) %>% 
-  rbind(ngamma_ratio_4_sim_large) %>% 
-  rbind(ngamma_median_4_sim_large)
-
-## get count of genes per gamma category per type, gene.list, and gamma.count
-# calculate percentage
-ngamma.df.table = ngamma.df %>% 
-  select(-c(transcript,
-            liklihood,
-            keep,
-            top.cat)) %>% 
-  table() %>% 
-  as.data.frame() %>% 
-  mutate(gamma.cat = as.numeric(as.character(gamma.cat))) %>% 
-  filter(Freq > 0) %>% 
-  group_by(type,
-           gene.list,
-           gamma.count) %>% 
-  mutate(total = sum(Freq)) %>% 
-  ungroup() %>% 
-  mutate(percent = 100*Freq/total)
-
-#### graph n_gamma_cats data ####
-### graph genes per category
-ngamma.df.table %>% 
-  ggplot(aes(x = gamma.cat,
-             y = percent,
-             group = gene.list,
-             color = gene.list)) +
-  geom_line() +
-  geom_point() +
-  theme_classic() +
-  facet_grid(gamma.count ~ type)
-ggsave('CAGEE/global_figures/n_gamma/Percent of genes per sigma category.png')
-
-## graph gene categories and gamma.cat
-ngamma_ratio_4_sim %>% 
-  rbind(ngamma_median_4_sim) %>% 
-  rbind(ngamma_median_4_sim_large) %>% 
-  rbind(ngamma_ratio_4_sim_large) %>% 
-  separate_wider_delim(cols = transcript,
-                       delim = 'SIG',
-                       names = c(NA,
-                                 'sigma'),
-                       cols_remove = F) %>% 
-  mutate(sigma = as.numeric(sigma)) %>% 
-  select(sigma, 
-         gamma.cat,
-         type,
-         gene.list) %>% 
-  table() %>% 
-  as.data.frame() %>% 
-  filter(Freq != 0) %>%
-  mutate(gamma.cat = as.numeric(as.character(gamma.cat)),
-         gamma.cat.type = ifelse(gamma.cat >= 1,
-                                 'high',
-                                 'low')) %>% 
-  ggplot(aes(x = sigma,
-             y = Freq,
-             fill = gamma.cat.type)) + 
-  geom_bar(position="stack", 
-           stat="identity") +
-  theme_classic() +
-  facet_grid(gene.list~type,
-             scales = 'free') +
-  xlab('simulated sigma') 
-ggsave('CAGEE/global_figures/n_gamma/Simulation percent of genes per sigma category.png')
+#### OLD: graph n_gamma_cats data ####
+# ### graph genes per category
+# ngamma.df.table %>% 
+#   ggplot(aes(x = gamma.cat,
+#              y = percent,
+#              group = gene.list,
+#              color = gene.list)) +
+#   geom_line() +
+#   geom_point() +
+#   theme_classic() +
+#   facet_grid(gamma.count ~ type)
+# ggsave('CAGEE/global_figures/n_gamma/Percent of genes per sigma category.png')
+# 
+# ## graph gene categories and gamma.cat
+# ngamma_ratio_4_sim %>% 
+#   rbind(ngamma_median_4_sim) %>% 
+#   rbind(ngamma_median_4_sim_large) %>% 
+#   rbind(ngamma_ratio_4_sim_large) %>% 
+#   separate_wider_delim(cols = transcript,
+#                        delim = 'SIG',
+#                        names = c(NA,
+#                                  'sigma'),
+#                        cols_remove = F) %>% 
+#   mutate(sigma = as.numeric(sigma)) %>% 
+#   select(sigma, 
+#          gamma.cat,
+#          type,
+#          gene.list) %>% 
+#   table() %>% 
+#   as.data.frame() %>% 
+#   filter(Freq != 0) %>%
+#   mutate(gamma.cat = as.numeric(as.character(gamma.cat)),
+#          gamma.cat.type = ifelse(gamma.cat >= 1,
+#                                  'high',
+#                                  'low')) %>% 
+#   ggplot(aes(x = sigma,
+#              y = Freq,
+#              fill = gamma.cat.type)) + 
+#   geom_bar(position="stack", 
+#            stat="identity") +
+#   theme_classic() +
+#   facet_grid(gene.list~type,
+#              scales = 'free') +
+#   xlab('simulated sigma') 
+# ggsave('CAGEE/global_figures/n_gamma/Simulation percent of genes per sigma category.png')
 
 #### load n_gamma_cats data low ####
 ### assign to lowest liklihood
@@ -3771,8 +3985,8 @@ ggsave('CAGEE/global_figures/n_gamma/Simulation percent of genes per sigma categ
 ## median
 # 4 categories 
 ngamma_low_median_4_sim = read_tsv('CAGEE/n_gamma_simulation/median_sim_100_cagee_outs_n_gamma_cats//category_likelihoods.txt') %>% 
-  dplyr::select(-c('...6')) %>% 
-  dplyr::rename(transcript = "Transcript ID") %>% 
+  select(-c('...6')) %>% 
+  rename(transcript = "Transcript ID") %>% 
   pivot_longer(cols = -c(transcript),
                values_to = "liklihood",
                names_to = 'gamma.cat') %>% 
@@ -3790,8 +4004,8 @@ ngamma_low_median_4_sim = read_tsv('CAGEE/n_gamma_simulation/median_sim_100_cage
 
 # large sigma
 ngamma_low_median_4_sim_large = read_tsv('CAGEE/n_gamma_simulation/median_sim_100_large_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
-  dplyr::select(-c('...6')) %>% 
-  dplyr::rename(transcript = "Transcript ID") %>% 
+  select(-c('...6')) %>% 
+  rename(transcript = "Transcript ID") %>% 
   pivot_longer(cols = -c(transcript),
                values_to = "liklihood",
                names_to = 'gamma.cat') %>% 
@@ -3810,8 +4024,8 @@ ngamma_low_median_4_sim_large = read_tsv('CAGEE/n_gamma_simulation/median_sim_10
 ## ratio
 # 4 categories 
 ngamma_low_ratio_4_sim = read_tsv('CAGEE/n_gamma_simulation/ratio_sim_100_cagee_outs_n_gamma_cats//category_likelihoods.txt') %>% 
-  dplyr::select(-c('...6')) %>% 
-  dplyr::rename(transcript = "Transcript ID") %>% 
+  select(-c('...6')) %>% 
+  rename(transcript = "Transcript ID") %>% 
   pivot_longer(cols = -c(transcript),
                values_to = "liklihood",
                names_to = 'gamma.cat') %>% 
@@ -3829,8 +4043,8 @@ ngamma_low_ratio_4_sim = read_tsv('CAGEE/n_gamma_simulation/ratio_sim_100_cagee_
 
 # large sigma
 ngamma_low_ratio_4_sim_large = read_tsv('CAGEE/n_gamma_simulation/ratio_sim_100_large_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
-  dplyr::select(-c('...6')) %>% 
-  dplyr::rename(transcript = "Transcript ID") %>% 
+  select(-c('...6')) %>% 
+  rename(transcript = "Transcript ID") %>% 
   pivot_longer(cols = -c(transcript),
                values_to = "liklihood",
                names_to = 'gamma.cat') %>% 
@@ -3850,8 +4064,8 @@ ngamma_low_ratio_4_sim_large = read_tsv('CAGEE/n_gamma_simulation/ratio_sim_100_
 ## median
 # 4 categories 
 ngamma_low_median_4 = read_tsv('CAGEE/median/median_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
-  dplyr::select(-c('...6')) %>% 
-  dplyr::rename(transcript = "Transcript ID") %>% 
+  select(-c('...6')) %>% 
+  rename(transcript = "Transcript ID") %>% 
   pivot_longer(cols = -c(transcript),
                values_to = "liklihood",
                names_to = 'gamma.cat') %>% 
@@ -3870,8 +4084,8 @@ ngamma_low_median_4 = read_tsv('CAGEE/median/median_cagee_outs_n_gamma_cats/cate
 ## ratio
 # 4 categories 
 ngamma_low_ratio_4 = read_tsv('CAGEE/ratio/ratio_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
-  dplyr::select(-c('...6')) %>% 
-  dplyr::rename(transcript = "Transcript ID") %>% 
+  select(-c('...6')) %>% 
+  rename(transcript = "Transcript ID") %>% 
   pivot_longer(cols = -c(transcript),
                values_to = "liklihood",
                names_to = 'gamma.cat') %>% 
@@ -3891,8 +4105,8 @@ ngamma_low_ratio_4 = read_tsv('CAGEE/ratio/ratio_cagee_outs_n_gamma_cats/categor
 ## median
 # 4 categories 
 ngamma_low_median_z_4 = read_tsv('CAGEE/median_z/median_z_cagee_outs_n_gamma_cats/category_likelihoods.txt') %>% 
-  dplyr::select(-c('...6')) %>% 
-  dplyr::rename(transcript = "Transcript ID") %>% 
+  select(-c('...6')) %>% 
+  rename(transcript = "Transcript ID") %>% 
   pivot_longer(cols = -c(transcript),
                values_to = "liklihood",
                names_to = 'gamma.cat') %>% 
@@ -3912,8 +4126,8 @@ ngamma_low_median_z_4 = read_tsv('CAGEE/median_z/median_z_cagee_outs_n_gamma_cat
 ## ratio
 # 4 categories 
 ngamma_low_ratio_z_4 = read_tsv('CAGEE/ratio/ratio_z_cagee_outs_n_gamma_cats/category_likelihoods.txt')%>% 
-  dplyr::select(-c('...6')) %>% 
-  dplyr::rename(transcript = "Transcript ID") %>% 
+  select(-c('...6')) %>% 
+  rename(transcript = "Transcript ID") %>% 
   pivot_longer(cols = -c(transcript),
                values_to = "liklihood",
                names_to = 'gamma.cat') %>% 
@@ -3934,8 +4148,8 @@ ngamma_low_ratio_z_4 = read_tsv('CAGEE/ratio/ratio_z_cagee_outs_n_gamma_cats/cat
 ## median
 # 10 categories 
 ngamma_low_median_10 = read_tsv('CAGEE/median/median_cagee_outs_n_gamma_cats_10/category_likelihoods.txt') %>% 
-  dplyr::select(-c('...12')) %>% 
-  dplyr::rename(transcript = "Transcript ID") %>% 
+  select(-c('...12')) %>% 
+  rename(transcript = "Transcript ID") %>% 
   pivot_longer(cols = -c(transcript),
                values_to = "liklihood",
                names_to = 'gamma.cat') %>% 
@@ -3954,8 +4168,8 @@ ngamma_low_median_10 = read_tsv('CAGEE/median/median_cagee_outs_n_gamma_cats_10/
 ## ratio
 # 10 categories 
 ngamma_low_ratio_10 = read_tsv('CAGEE/ratio/ratio_cagee_outs_n_gamma_cats_10/category_likelihoods.txt') %>% 
-  dplyr::select(-c('...12')) %>% 
-  dplyr::rename(transcript = "Transcript ID") %>% 
+  select(-c('...12')) %>% 
+  rename(transcript = "Transcript ID") %>% 
   pivot_longer(cols = -c(transcript),
                values_to = "liklihood",
                names_to = 'gamma.cat') %>% 
@@ -3975,8 +4189,8 @@ ngamma_low_ratio_10 = read_tsv('CAGEE/ratio/ratio_cagee_outs_n_gamma_cats_10/cat
 ## median
 # 10 categories 
 ngamma_low_median_z_10 = read_tsv('CAGEE/median_z/median_z_cagee_outs_n_gamma_cats_10/category_likelihoods.txt') %>% 
-  dplyr::select(-c('...12')) %>% 
-  dplyr::rename(transcript = "Transcript ID") %>% 
+  select(-c('...12')) %>% 
+  rename(transcript = "Transcript ID") %>% 
   pivot_longer(cols = -c(transcript),
                values_to = "liklihood",
                names_to = 'gamma.cat') %>% 
@@ -3996,8 +4210,8 @@ ngamma_low_median_z_10 = read_tsv('CAGEE/median_z/median_z_cagee_outs_n_gamma_ca
 ## ratio
 # 10 categories 
 ngamma_low_ratio_z_10 = read_tsv('CAGEE/ratio/ratio_z_cagee_outs_n_gamma_cats_10/category_likelihoods.txt')%>% 
-  dplyr::select(-c('...12')) %>% 
-  dplyr::rename(transcript = "Transcript ID") %>% 
+  select(-c('...12')) %>% 
+  rename(transcript = "Transcript ID") %>% 
   pivot_longer(cols = -c(transcript),
                values_to = "liklihood",
                names_to = 'gamma.cat') %>% 
@@ -4030,7 +4244,7 @@ ngamma_low.df = rbind(ngamma_low_median_4,
 ## get count of genes per gamma category per type, gene.list, and gamma.count
 # calculate percentage
 ngamma_low.df.table = ngamma_low.df %>% 
-  dplyr::select(-c(transcript,
+  select(-c(transcript,
             liklihood,
             keep,
             top.cat)) %>% 
@@ -4047,51 +4261,18 @@ ngamma_low.df.table = ngamma_low.df %>%
 
 #### graph n_gamma_cats data low ####
 ### graph genes per category
-# ngamma_low.df.table %>% 
-#   ggplot(aes(x = gamma.cat,
-#              y = percent,
-#              group = gene.list,
-#              color = gene.list)) +
-#   geom_line() +
-#   geom_point() +
-#   theme_classic() +
-#   facet_grid(gamma.count ~ type)
-# ggsave('CAGEE/global_figures/n_gamma/Percent of genes per sigma category low.png')
+ngamma_low.df.table %>% 
+  ggplot(aes(x = gamma.cat,
+             y = percent,
+             group = gene.list,
+             color = gene.list)) +
+  geom_line() +
+  geom_point() +
+  theme_classic() +
+  facet_grid(gamma.count ~ type)
+ggsave('CAGEE/global_figures/n_gamma/Percent of genes per sigma category low.png')
 
 ## graph gene categories and gamma.cat
-# ngamma_low_ratio_4_sim %>% 
-#   rbind(ngamma_low_median_4_sim) %>% 
-#   rbind(ngamma_low_median_4_sim_large) %>% 
-#   rbind(ngamma_low_ratio_4_sim_large) %>% 
-#   separate_wider_delim(cols = transcript,
-#                        delim = 'SIG',
-#                        names = c(NA,
-#                                  'sigma'),
-#                        cols_remove = F) %>% 
-#   mutate(sigma = as.numeric(sigma)) %>% 
-#   select(sigma, 
-#          gamma.cat,
-#          type,
-#          gene.list) %>% 
-#   table() %>% 
-#   as.data.frame() %>% 
-#   filter(Freq != 0) %>% 
-#   group_by(gene.list,
-#             type) %>% 
-#   mutate(gamma.cat.type = dense_rank(gamma.cat),
-#          sigma.type = dense_rank(sigma)) %>%
-#   ggplot(aes(x = sigma.type,
-#              y = Freq,
-#              fill = gamma.cat.type)) + 
-#   geom_bar(position="stack", 
-#            stat="identity") +
-#   theme_classic() +
-#   facet_grid(gene.list~type,
-#              scales = 'free') +
-#   xlab('simulated sigma') 
-# ggsave('CAGEE/global_figures/n_gamma/Simulation percent of genes per sigma category_low.png')
-
-# paper
 ngamma_low_ratio_4_sim %>% 
   rbind(ngamma_low_median_4_sim) %>% 
   rbind(ngamma_low_median_4_sim_large) %>% 
@@ -4110,7 +4291,7 @@ ngamma_low_ratio_4_sim %>%
   as.data.frame() %>% 
   filter(Freq != 0) %>% 
   group_by(gene.list,
-           type) %>% 
+            type) %>% 
   mutate(gamma.cat.type = dense_rank(gamma.cat),
          sigma.type = dense_rank(sigma)) %>%
   ggplot(aes(x = sigma.type,
@@ -4118,52 +4299,14 @@ ngamma_low_ratio_4_sim %>%
              fill = gamma.cat.type)) + 
   geom_bar(position="stack", 
            stat="identity") +
-  theme_classic(base_size = 8) +
+  theme_classic() +
   facet_grid(gene.list~type,
              scales = 'free') +
-  xlab('simulated sigma') +
-  # theme(legend.key.size = unit(.2, 'in')) +
-  theme(legend.position = 'none')
-ggsave('CAGEE/global_figures/n_gamma/Simulation percent of genes per sigma category_low.pdf',
-       height = 3.25,
-       width = 3.25,
-       units = 'in',
-       dpi = 320)
+  xlab('simulated sigma') 
+ggsave('CAGEE/global_figures/n_gamma/Simulation percent of genes per sigma category_low.png')
 
 ## compare known sigma to calculated rates
 # pull sigma from results files
-# ngamma_low.df.table %>% 
-#   filter(gene.list %in% c('sim',
-#                           'sim.large')) %>% 
-#   select(gamma.cat, 
-#          type,
-#          gene.list) %>% 
-#   distinct() %>%  
-#   mutate(rate = case_when(
-#     gene.list == 'sim' & type == 'median' ~ 0.012539,
-#     gene.list == 'sim' & type == 'ratio' ~ 0.000926,
-#     gene.list == 'sim.large' & type == 'median' ~ 0.250032,
-#     gene.list == 'sim.large' & type == 'ratio' ~ 0.044866
-#   ),
-#   rate.gamma = gamma.cat*rate) %>% 
-#   cbind(data.frame(rate.sim = c(0.005, 0.010, 0.015, 0.020,
-#                                 0.0003, 0.0006, 0.0009, 0.0012,
-#                                 0.001, 0.010, 0.1, 1,
-#                                 0.0001, 0.001, 0.01, 0.1))) %>% 
-#   ggplot(aes(y = rate.gamma,
-#              x = rate.sim,
-#              group = gene.list,
-#              color = gene.list)) +
-#   geom_abline(slope = 1,
-#               intercept = 0)+
-#     geom_point() +
-#     geom_line() + 
-#     facet_wrap(~gene.list + type,
-#           scales = 'free') +
-#   theme_classic()
-# ggsave('CAGEE/global_figures/n_gamma/Simulation rate vs gamma rate low.png')
-
-# paper
 ngamma_low.df.table %>% 
   filter(gene.list %in% c('sim',
                           'sim.large')) %>% 
@@ -4184,24 +4327,161 @@ ngamma_low.df.table %>%
                                 0.0001, 0.001, 0.01, 0.1))) %>% 
   ggplot(aes(y = rate.gamma,
              x = rate.sim,
-             group = gene.list)) +
+             group = gene.list,
+             color = gene.list)) +
   geom_abline(slope = 1,
-              intercept = 0,
-              linetype = 'dashed',
-              color = 'darkgrey')+
-  geom_point() +
-  geom_line() + 
-  facet_wrap(~gene.list + type,
-             scales = 'free') +
-  theme_classic(base_size = 8) +
-  theme(legend.position = 'none')
-ggsave('CAGEE/global_figures/n_gamma/Simulation rate vs gamma rate low.pdf',
-       height = 3.25,
-       width = 3.25,
-       units = 'in',
-       dpi = 320)
+              intercept = 0)+
+    geom_point() +
+    geom_line() + 
+    facet_wrap(~gene.list + type,
+          scales = 'free') +
+  theme_classic()
+ggsave('CAGEE/global_figures/n_gamma/Simulation rate vs gamma rate low.png')
 
 #### compare gamma cats with ancestral state ####
+#### all genes
+### load data
+## ratio
+# 10 categories 
+ngamma_low_10 = read_tsv('CAGEE/median/median_cagee_outs_n_gamma_cats_10/category_likelihoods.txt') %>% 
+  dplyr::select(-c('...12')) %>% 
+  rename(transcript = "Transcript ID") %>% 
+  pivot_longer(cols = -c(transcript),
+               values_to = "liklihood",
+               names_to = 'gamma.cat') %>% 
+  mutate(gamma.cat = as.numeric(gamma.cat)) %>% 
+  group_by(transcript) %>%
+  mutate(top.cat = min(liklihood)) %>% 
+  ungroup() %>% 
+  mutate(keep = ifelse(top.cat == liklihood,
+                       1,
+                       0)) %>% 
+  filter(keep == 1) %>% 
+  mutate(type = 'median',
+         gene.list = 'all',
+         gamma.count = 10)
+
+# get sigma 
+ngamma_low_10.sigma = read.delim('CAGEE/median/median_cagee_outs_n_gamma_cats_10/results.txt') %>% 
+  separate_wider_delim(CAGEE.1.1,
+                       delim = ': ',
+                       names = c("CAGEE.1.1",
+                                 "result"),
+                       too_few = 'align_end',
+                       too_many = "merge") %>% 
+  filter(CAGEE.1.1 == 'Sigma2') %>% 
+  pull(result) %>% 
+  as.numeric()
+
+## get ancestral state at root 
+median.ancestral.state.df = read_tsv('CAGEE/median/median_cagee_outs_n_gamma_cats_10/ancestral_states.tab') %>% 
+  dplyr::select(TranscriptID,
+                '<11>') %>% 
+  rename(root = '<11>') %>% 
+  rename(transcript = TranscriptID)
+
+#### graph
+### compare ancestral state values with sigma categories
+# use log of root value
+ngamma_low_10 %>% 
+  left_join(median.ancestral.state.df) %>%
+  mutate(log.root = log(root),
+         mean.log.root = mean(log.root)) %>% 
+  ggplot(aes(y = gamma.cat*ngamma_low_10.sigma,
+             x = log.root,
+             group = gamma.cat)) +
+  geom_boxplot(outlier.shape = NA) +
+  theme_classic() +
+  ylab('Expression rate category') +
+  xlab('Ancestral state expression (ln)') +
+  ggtitle('All genes sigma categories vs ancestral state') 
+ggsave('CAGEE/global_figures/n_gamma/compare/All genes sigma categories vs ancestral state.png')
+
+# paper
+ngamma_low_10 %>% 
+  left_join(median.ancestral.state.df) %>%
+  mutate(log.root = log(root),
+         mean.log.root = mean(log.root)) %>% 
+  ggplot(aes(y = gamma.cat*ngamma_low_10.sigma,
+             x = log.root,
+             group = gamma.cat)) +
+  geom_boxplot(outlier.shape = NA) +
+  theme_classic() +
+  ylab('Expression rate') +
+  xlab('Ancestral state expression (ln)') 
+ggsave('CAGEE/global_figures/n_gamma/compare/All genes sigma categories vs ancestral state paper.pdf',
+       height = 5,
+       width = 6.4,
+       dpi = 720)
+
+
+## statistical testing difference in expression level and sigma
+# create temp dataframe
+tmp =  ngamma_low_10 %>% 
+  right_join(median.ancestral.state.df)  %>%
+  mutate(log.root = log(root),
+         sigma = gamma.cat*ngamma_low_10.sigma,
+         mean.log.root = mean(log.root))
+
+# t.test if genes with ancestral state below 5 have lower sigma
+t.test(x = tmp %>% filter(log.root<5) %>% pull(sigma),
+       y = tmp %>% filter(log.root>=5) %>% pull(sigma))
+
+# np.loc test for each sigma category 
+ngamma_low_10.pvalue = ngamma_low_10 %>% 
+  right_join(median.ancestral.state.df)  %>%
+  mutate(log.root = log(root),
+         sigma = gamma.cat*ngamma_low_10.sigma,
+         mean.log.root = mean(log.root)) %>%
+  group_by(sigma,
+           mean.log.root) %>%
+  summarise(P = np.loc.test(log.root, 
+                            mu = mean.log.root,
+                            R = 10000,
+                            parallel = T,
+                            median.test = T,
+                            symmetric = T)$p.value,
+            estimate = np.loc.test(log.root, 
+                          mu = mean.log.root,
+                            R = 10000,
+                            parallel = T,
+                            median.test = T,
+                            symmetric = T)$estimate,
+            Sig = ifelse(P < 0.05, "*", NA)) %>% 
+  mutate(p.adj = p.adjust(P,
+                          method = 'fdr',
+                          n = 10),
+         Sig.adj = ifelse(p.adj < 0.05, "*", NA),
+         estimate.diff = estimate-mean.log.root,
+         estimate.diff.count = exp(estimate.diff))
+
+ngamma_low_10.pvalue = ngamma_low_10 %>% 
+  right_join(median.ancestral.state.df)  %>%
+  mutate(log.root = log(root),
+         sigma = gamma.cat*ngamma_low_10.sigma,
+         mean.log.root = mean(log.root)) %>%
+  group_by(sigma,
+           mean.log.root) %>%
+  summarise(P = np.loc.test(log.root, 
+                            mu = mean.log.root,
+                            R = 10000,
+                            parallel = T,
+                            median.test = T,
+                            symmetric = T)$p.value,
+            estimate = np.loc.test(log.root, 
+                                   mu = mean.log.root,
+                                   R = 10000,
+                                   parallel = T,
+                                   median.test = T,
+                                   symmetric = T)$estimate,
+            Sig = ifelse(P < 0.05, "*", NA)) %>% 
+  mutate(p.adj = p.adjust(P,
+                          method = 'fdr',
+                          n = 10),
+         Sig.adj = ifelse(p.adj < 0.05, "*", NA),
+         estimate.diff = estimate-mean.log.root,
+         estimate.diff.count = exp(estimate.diff))
+
 #### z
 ### load data
 ## ratio
@@ -4344,44 +4624,44 @@ ngamma_low_median_10.sigma = read.delim('CAGEE/median/median_cagee_outs_n_gamma_
   pull(result) %>% 
   as.numeric()
 
-# #### graph
-# ### compare ancestral state values with sigma categories
-# # use log of root value
-# ngamma_low_ratio_10 %>% 
-#   left_join(ratio.z.ancestral.state.df) %>%
-#   mutate(log.root = log(root),
-#          mean.log.root = mean(log.root)) %>% 
-#   ggplot(aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
-#              y = log.root,
-#              group = gamma.cat)) +
-#   # geom_hline(yintercept = log(2),
-#   #            linetype = 'dashed') +
-#   geom_hline(yintercept = 0.4252187,
-#                         linetype = 'dashed') +
-#   geom_hline(yintercept = 0) +
-#   geom_violin() +
-#   geom_boxplot() +
-#   stat_summary(fun.y=mean, 
-#                geom="point", 
-#                shape=20, 
-#                size=2, 
-#                color="red", 
-#                fill="red") +
-#   theme_classic() +
-#   geom_text(data = ngamma_low_ratio_10 %>% 
-#               group_by(gamma.cat) %>% 
-#               summarise(count = n()),
-#             aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
-#                 label = paste0(count),
-#                 y = 0.85)) +
-#   xlab('Sigma category') +
-#   ylab('Sex ratio ancestral state (log)') +
-#   ggtitle('Z chromosome sigma categories vs ancestral state') +
-#   scale_y_continuous(breaks = c(-0.4,
-#                                 0,
-#                                 0.4,
-#                                 0.8))
-# ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome sigma categories vs ancestral state.png')
+#### graph
+### compare ancestral state values with sigma categories
+# use log of root value
+ngamma_low_ratio_10 %>% 
+  left_join(ratio.z.ancestral.state.df) %>%
+  mutate(log.root = log(root),
+         mean.log.root = mean(log.root)) %>% 
+  ggplot(aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
+             y = log.root,
+             group = gamma.cat)) +
+  # geom_hline(yintercept = log(2),
+  #            linetype = 'dashed') +
+  geom_hline(yintercept = 0.4252187,
+                        linetype = 'dashed') +
+  geom_hline(yintercept = 0) +
+  geom_violin() +
+  geom_boxplot() +
+  stat_summary(fun.y=mean, 
+               geom="point", 
+               shape=20, 
+               size=2, 
+               color="red", 
+               fill="red") +
+  theme_classic() +
+  geom_text(data = ngamma_low_ratio_10 %>% 
+              group_by(gamma.cat) %>% 
+              summarise(count = n()),
+            aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
+                label = paste0(count),
+                y = 0.85)) +
+  xlab('Sigma category') +
+  ylab('Sex ratio ancestral state (log)') +
+  ggtitle('Z chromosome sigma categories vs ancestral state') +
+  scale_y_continuous(breaks = c(-0.4,
+                                0,
+                                0.4,
+                                0.8))
+ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome sigma categories vs ancestral state.png')
 
 
 ### statistics
@@ -4567,38 +4847,6 @@ summary(ngamma_low_median_z_10.pvalue.ord)
 ## for paper
 ## graph with significance
 ## ratio
-# ngamma_low_ratio_10 %>% 
-#   right_join(ratio.z.ancestral.state.df) %>%
-#   mutate(log.root = log(root),
-#          mean.log.root = mean(log.root)) %>% 
-#   ggplot(aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
-#              y = log.root,
-#              group = gamma.cat)) +
-#   geom_hline(yintercept = 0) +
-#   geom_violin() + 
-#   stat_summary(fun.y=mean, 
-#                geom="point", 
-#                shape=18,
-#                size=3, 
-#                color="red") +
-#   geom_text(data = ngamma_low_ratio_z_10.pvalue,
-#             aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
-#                 label = Sig.adj,
-#                 y = 0.85)) +
-#   theme_classic() +
-#   geom_hline(yintercept = 0.4252187,
-#              linetype = 'dashed') +
-#   xlab('Ratio sigma category') +
-#   ylab('Sex ratio ancestral state (ln)') +
-#   ggtitle('Z chromosome ratio sigma categories vs ancestral state') +
-#   scale_y_continuous(breaks = c(-0.4,
-#                                 0,
-#                                 0.4,
-#                                 0.8))
-# ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome ratio sigma categories vs ancestral state sig paper.png')
-
-# flip axis
-# boxplot
 ngamma_low_ratio_10 %>% 
   right_join(ratio.z.ancestral.state.df) %>%
   mutate(log.root = log(root),
@@ -4606,91 +4854,56 @@ ngamma_low_ratio_10 %>%
   ggplot(aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
              y = log.root,
              group = gamma.cat)) +
+  geom_hline(yintercept = 0) +
+  geom_violin() + 
+  stat_summary(fun.y=mean, 
+               geom="point", 
+               shape=18,
+               size=3, 
+               color="red") +
+  geom_text(data = ngamma_low_ratio_z_10.pvalue,
+            aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
+                label = Sig.adj,
+                y = 0.85)) +
+  theme_classic() +
   geom_hline(yintercept = 0.4252187,
              linetype = 'dashed') +
-  geom_hline(yintercept = 0) +
-  geom_boxplot(position = position_dodge2(preserve = "single"),
-               width = 0.00003,
-               fill = 'lightgrey') +
-  theme_classic() +
   xlab('Ratio sigma category') +
   ylab('Sex ratio ancestral state (ln)') +
   ggtitle('Z chromosome ratio sigma categories vs ancestral state') +
   scale_y_continuous(breaks = c(-0.4,
                                 0,
                                 0.4,
-                                0.8))+
-  coord_flip()
-ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome ratio sigma categories vs ancestral state sig flip paper.png')
+                                0.8))
+ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome ratio sigma categories vs ancestral state sig paper.png')
 
-
-# paper
+# flip axis
+# open circle jitter
 ngamma_low_ratio_10 %>% 
   right_join(ratio.z.ancestral.state.df) %>%
   mutate(log.root = log(root),
          mean.log.root = mean(log.root)) %>% 
-  ggplot(aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
-             y = log.root,
+  ggplot(aes(y = gamma.cat*ngamma_low_ratio_10.sigma,
+             x = log.root,
              group = gamma.cat)) +
-  geom_hline(yintercept = 0) +
-  geom_boxplot(position = position_dodge2(preserve = "single"),
-               width = 0.00003,
-               fill = 'red') +
-  geom_hline(yintercept = 0.4252187,
-             linetype = 'dashed') +
-  theme_classic(base_size = 8) +
-  xlab('Ratio sigma category') +
-  ylab('Sex ratio ancestral state (ln)') +
-  scale_y_continuous(breaks = c(-0.4,
-                                0,
-                                0.4,
-                                0.8))+
-  coord_flip()
-ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome ratio sigma categories vs ancestral state sig flip paper.pdf',
-       height = 4,
-       width = 6.5,
-       units = 'in',
-       dpi = 320)
-
-# paper
-# ordered
-ngamma_low_ratio_10 %>% 
-  right_join(ratio.z.ancestral.state.df) %>%
-  mutate(log.root = log(root),
-         mean.log.root = mean(log.root),
-         sigma_value =formatC(gamma.cat*ngamma_low_ratio_10.sigma, 
-                              format = "e", 
-                              digits = 2)) %>% 
-  ggplot(aes(x = reorder(sigma_value,
-                         gamma.cat),
-             y = log.root,
-             group = gamma.cat*ngamma_low_ratio_10.sigma
-             )) +
-  geom_hline(yintercept = 0) +
-  geom_boxplot(position = position_dodge2(preserve = "single"),
-               fill = 'red') +
-  geom_hline(yintercept = 0.4252187,
-             linetype = 'dashed') +
-  theme_classic(base_size = 8) +
-  xlab('Ratio sigma category') +
-  ylab('Sex ratio ancestral state (ln)') +
-  scale_y_continuous(breaks = c(-0.4,
-                                0,
-                                0.4,
-                                0.8)) +
-  # scale_x_discrete(breaks = c(1e-05,
-  #                               0.00041,
-  #                               0.00183)) +
-  coord_flip()
-ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome ratio sigma categories vs ancestral state sig flip order paper.pdf',
-       height = 4,
-       width = 6.5,
-       units = 'in',
-       dpi = 320)
+  geom_vline(xintercept = 0,
+             color = 'grey50') +
+  geom_jitter(width = 0.006,
+              height = 0.0004,
+              shape = 21,
+              color = 'red') +
+  theme_classic() +
+  geom_vline(xintercept = 0.4252187,
+             linetype = 'dashed',
+             color = 'grey50') +
+  ylab('Ratio sigma category') +
+  xlab('Sex ratio ancestral state (ln)') +
+  ggtitle('Z chromosome ratio ancestral state vs ratio sigma category') +
+  coord_fixed(0.8/0.0020)
+ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome ancestral state vs ratio sigma category open.png')
 
 # 
-# # flip axis
-# # open circle jitter
+# # add area
 # ngamma_low_ratio_10 %>% 
 #   right_join(ratio.z.ancestral.state.df) %>%
 #   mutate(log.root = log(root),
@@ -4698,112 +4911,87 @@ ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome ratio sigma categories vs an
 #   ggplot(aes(y = gamma.cat*ngamma_low_ratio_10.sigma,
 #              x = log.root,
 #              group = gamma.cat)) +
-#   geom_vline(xintercept = 0,
-#              color = 'grey50') +
-#   geom_jitter(width = 0.006,
-#               height = 0.0004,
-#               shape = 21,
-#               color = 'red') +
+#   geom_vline(xintercept = 0) +
+#   geom_count(aes(color = after_stat(n), 
+#                  size = after_stat(n))) +
+#   guides(color = 'legend') +
+#   # scale_x_binned(n.breaks = 10) +
 #   theme_classic() +
 #   geom_vline(xintercept = 0.4252187,
-#              linetype = 'dashed',
-#              color = 'grey50') +
+#              linetype = 'dashed') +
 #   ylab('Ratio sigma category') +
 #   xlab('Sex ratio ancestral state (ln)') +
-#   ggtitle('Z chromosome ratio ancestral state vs ratio sigma category') +
-#   coord_fixed(0.8/0.0020)
-# ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome ancestral state vs ratio sigma category open.png')
+#   ggtitle('Z chromosome ratio sigma categories vs ancestral state') +
+#   # scale_x_continuous(breaks = c(-0.4,
+#   #                               0,
+#   #                               0.4,
+#   #                               0.8)) +
+#   scale_color_gradient(low = 'red1',
+#                        high = 'red4')
+# ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome ancestral state vs ratio sigma category area.png')
 # 
-# # 
-# # # add area
-# # ngamma_low_ratio_10 %>% 
-# #   right_join(ratio.z.ancestral.state.df) %>%
-# #   mutate(log.root = log(root),
-# #          mean.log.root = mean(log.root)) %>% 
-# #   ggplot(aes(y = gamma.cat*ngamma_low_ratio_10.sigma,
-# #              x = log.root,
-# #              group = gamma.cat)) +
-# #   geom_vline(xintercept = 0) +
-# #   geom_count(aes(color = after_stat(n), 
-# #                  size = after_stat(n))) +
-# #   guides(color = 'legend') +
-# #   # scale_x_binned(n.breaks = 10) +
-# #   theme_classic() +
-# #   geom_vline(xintercept = 0.4252187,
-# #              linetype = 'dashed') +
-# #   ylab('Ratio sigma category') +
-# #   xlab('Sex ratio ancestral state (ln)') +
-# #   ggtitle('Z chromosome ratio sigma categories vs ancestral state') +
-# #   # scale_x_continuous(breaks = c(-0.4,
-# #   #                               0,
-# #   #                               0.4,
-# #   #                               0.8)) +
-# #   scale_color_gradient(low = 'red1',
-# #                        high = 'red4')
-# # ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome ancestral state vs ratio sigma category area.png')
-# # 
+
+## median
+ngamma_low_median_10 %>% 
+  right_join(ratio.z.ancestral.state.df) %>%
+  mutate(log.root = log(root),
+         mean.log.root = mean(log.root)) %>% 
+  ggplot(aes(x = gamma.cat*ngamma_low_median_10.sigma,
+             y = log.root,
+             group = gamma.cat)) +
+  geom_hline(yintercept = 0) +
+  geom_violin() + 
+  stat_summary(fun.y=mean, 
+               geom="point", 
+               shape=18,
+               size=3, 
+               color="red") +
+  geom_text(data = ngamma_low_median_z_10.pvalue,
+            aes(x = gamma.cat*ngamma_low_median_10.sigma,
+                label = Sig.adj,
+                y = 0.85)) +
+  theme_classic() +
+  geom_hline(yintercept = 0.4252187,
+             linetype = 'dashed') +
+  xlab('Median sigma category') +
+  ylab('Sex ratio ancestral state (ln)') +
+  ggtitle('Z chromosome median sigma categories vs ancestral state') +
+  # coord_fixed(0.04/0.8) +
+  scale_y_continuous(breaks = c(-0.4,
+                                0,
+                                0.4,
+                                0.8))
+ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome sigma categories vs ancestral state sig paper.png')
+
+# flip axis
+# open circle jitter
+ngamma_low_median_10 %>% 
+  right_join(ratio.z.ancestral.state.df) %>%
+  mutate(log.root = log(root),
+         mean.log.root = mean(log.root)) %>% 
+  ggplot(aes(y = gamma.cat*ngamma_low_median_10.sigma,
+             x = log.root,
+             group = gamma.cat)) +
+  geom_vline(xintercept = 0,
+             color = 'grey50') +
+  geom_jitter(width = 0.006,
+              height = 0.0004,
+              shape = 21,
+              color = 'red') +
+  theme_classic() +
+  geom_vline(xintercept = 0.4252187,
+             linetype = 'dashed',
+             color = 'grey50') +
+  ylab('Median sigma category') +
+  xlab('Sex ratio ancestral state (ln)') +
+  ggtitle('Z chromosome ratio ancestral state vs median sigma category') +
+  scale_x_continuous(breaks = c(-0.4,
+                                0,
+                                0.4,
+                                0.8)) +
+  coord_fixed(0.8/0.04)
+ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome ancestral state vs median sigma category open.png')
 # 
-# ## median
-# ngamma_low_median_10 %>% 
-#   right_join(ratio.z.ancestral.state.df) %>%
-#   mutate(log.root = log(root),
-#          mean.log.root = mean(log.root)) %>% 
-#   ggplot(aes(x = gamma.cat*ngamma_low_median_10.sigma,
-#              y = log.root,
-#              group = gamma.cat)) +
-#   geom_hline(yintercept = 0) +
-#   geom_violin() + 
-#   stat_summary(fun.y=mean, 
-#                geom="point", 
-#                shape=18,
-#                size=3, 
-#                color="red") +
-#   geom_text(data = ngamma_low_median_z_10.pvalue,
-#             aes(x = gamma.cat*ngamma_low_median_10.sigma,
-#                 label = Sig.adj,
-#                 y = 0.85)) +
-#   theme_classic() +
-#   geom_hline(yintercept = 0.4252187,
-#              linetype = 'dashed') +
-#   xlab('Median sigma category') +
-#   ylab('Sex ratio ancestral state (ln)') +
-#   ggtitle('Z chromosome median sigma categories vs ancestral state') +
-#   # coord_fixed(0.04/0.8) +
-#   scale_y_continuous(breaks = c(-0.4,
-#                                 0,
-#                                 0.4,
-#                                 0.8))
-# ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome sigma categories vs ancestral state sig paper.png')
-# 
-# # flip axis
-# # open circle jitter
-# ngamma_low_median_10 %>% 
-#   right_join(ratio.z.ancestral.state.df) %>%
-#   mutate(log.root = log(root),
-#          mean.log.root = mean(log.root)) %>% 
-#   ggplot(aes(y = gamma.cat*ngamma_low_median_10.sigma,
-#              x = log.root,
-#              group = gamma.cat)) +
-#   geom_vline(xintercept = 0,
-#              color = 'grey50') +
-#   geom_jitter(width = 0.006,
-#               height = 0.0004,
-#               shape = 21,
-#               color = 'red') +
-#   theme_classic() +
-#   geom_vline(xintercept = 0.4252187,
-#              linetype = 'dashed',
-#              color = 'grey50') +
-#   ylab('Median sigma category') +
-#   xlab('Sex ratio ancestral state (ln)') +
-#   ggtitle('Z chromosome ratio ancestral state vs median sigma category') +
-#   scale_x_continuous(breaks = c(-0.4,
-#                                 0,
-#                                 0.4,
-#                                 0.8)) +
-#   coord_fixed(0.8/0.04)
-# ggsave('CAGEE/global_figures/n_gamma/Z/Z chromosome ancestral state vs median sigma category open.png')
-# # 
 # # open circle jitter alpha
 # ngamma_low_median_10 %>% 
 #   right_join(ratio.z.ancestral.state.df) %>%
@@ -5387,83 +5575,83 @@ ngamma_low_median_10_pos.table.stat = ngamma_low_median_10_pos.table %>%
 
 #### graph n_gamma_cats data low position
 ### graph genes per category per chromsoome
-# ngamma_low_median_10_pos.table %>% 
-#   mutate(Chr = ifelse(chromosome_name == 'Z',
-#                       'Z',
-#                       'Auto')) %>% 
-#   ggplot(aes(x = gamma.cat*ngamma_low_median_10.sigma,
-#              y = percent,
-#              group = chromosome_name,
-#              color = Chr)) +
-#   geom_line() +
-#   geom_point() +
-#   theme_classic() +
-#   scale_color_manual(values = c('black',
-#                                 'red')) +
-#   xlab('Sigma category')
-# ggsave('CAGEE/global_figures/n_gamma/Z/Percent of genes per sigma category low chromosome_name.png')
-# 
-# ## filter for chrosmomes with genes > 150
-# ngamma_low_median_10_pos.table %>% 
-#   mutate(Chr = ifelse(chromosome_name == 'Z',
-#                       'Z',
-#                       'Auto')) %>% 
-#   filter(total > 26) %>% 
-#   ggplot(aes(x = gamma.cat*ngamma_low_median_10.sigma,
-#              y = percent,
-#              group = chromosome_name,
-#              color = Chr)) +
-#   geom_line() +
-#   geom_point() +
-#   theme_classic() +
-#   scale_color_manual(values = c('black',
-#                                 'red'))+
-#   xlab('Sigma category')
-# ggsave('CAGEE/global_figures/n_gamma/Z/Percent of genes per sigma category low chromosome_name filter.png')
-# 
-# ## add label
-# ngamma_low_median_10_pos.table %>% 
-#   mutate(Chr = ifelse(chromosome_name == 'Z',
-#                       'Z',
-#                       'Auto')) %>% 
-#   filter(total > 26) %>% 
-#   mutate(label = ifelse(gamma.cat == max(ngamma_low_median_10_pos.table$gamma.cat),
-#                         as.character(chromosome_name),
-#                         NA)) %>% 
-#   ggplot(aes(x = gamma.cat*ngamma_low_median_10.sigma,
-#              y = percent,
-#              group = chromosome_name,
-#              color = Chr)) +
-#   geom_line() +
-#   geom_point() +
-#   ggrepel::geom_label_repel(aes(label = label),
-#                             max.overlaps = 50,
-#                             color = 'orange') +
-#   theme_classic() +
-#   scale_color_manual(values = c('black',
-#                                 'red'))+
-#   xlab('Sigma category')
-# ggsave('CAGEE/global_figures/n_gamma/Z/Percent of genes per sigma category low chromosome_name filter label.png')
-# 
-# ### graph autosomes vs Z
-# ngamma_low_median_10_pos.table.stat %>%
-#   dplyr::select(gamma.cat.value,
-#                 Percent.cat,
-#                 Chr,
-#                 SE.cat) %>% 
-#   ggplot(aes(x = gamma.cat.value,
-#              y = Percent.cat,
-#              color = Chr)) +
-#   geom_errorbar(aes( ymin = Percent.cat - SE.cat,
-#                      ymax = Percent.cat + SE.cat)) +
-#   geom_line() +
-#   geom_point() +
-#   theme_classic() +
-#   scale_color_manual(values = c('black',
-#                                 'red'))+
-#   xlab('Sigma category') +
-#   ggtitle('Percent of genes per sigma category, standard error')
-# ggsave('CAGEE/global_figures/n_gamma/Z/Percent of genes per sigma category low chromosome_name filter Autosomes.png')
+ngamma_low_median_10_pos.table %>% 
+  mutate(Chr = ifelse(chromosome_name == 'Z',
+                      'Z',
+                      'Auto')) %>% 
+  ggplot(aes(x = gamma.cat*ngamma_low_median_10.sigma,
+             y = percent,
+             group = chromosome_name,
+             color = Chr)) +
+  geom_line() +
+  geom_point() +
+  theme_classic() +
+  scale_color_manual(values = c('black',
+                                'red')) +
+  xlab('Sigma category')
+ggsave('CAGEE/global_figures/n_gamma/Z/Percent of genes per sigma category low chromosome_name.png')
+
+## filter for chrosmomes with genes > 150
+ngamma_low_median_10_pos.table %>% 
+  mutate(Chr = ifelse(chromosome_name == 'Z',
+                      'Z',
+                      'Auto')) %>% 
+  filter(total > 26) %>% 
+  ggplot(aes(x = gamma.cat*ngamma_low_median_10.sigma,
+             y = percent,
+             group = chromosome_name,
+             color = Chr)) +
+  geom_line() +
+  geom_point() +
+  theme_classic() +
+  scale_color_manual(values = c('black',
+                                'red'))+
+  xlab('Sigma category')
+ggsave('CAGEE/global_figures/n_gamma/Z/Percent of genes per sigma category low chromosome_name filter.png')
+
+## add label
+ngamma_low_median_10_pos.table %>% 
+  mutate(Chr = ifelse(chromosome_name == 'Z',
+                      'Z',
+                      'Auto')) %>% 
+  filter(total > 26) %>% 
+  mutate(label = ifelse(gamma.cat == max(ngamma_low_median_10_pos.table$gamma.cat),
+                        as.character(chromosome_name),
+                        NA)) %>% 
+  ggplot(aes(x = gamma.cat*ngamma_low_median_10.sigma,
+             y = percent,
+             group = chromosome_name,
+             color = Chr)) +
+  geom_line() +
+  geom_point() +
+  ggrepel::geom_label_repel(aes(label = label),
+                            max.overlaps = 50,
+                            color = 'orange') +
+  theme_classic() +
+  scale_color_manual(values = c('black',
+                                'red'))+
+  xlab('Sigma category')
+ggsave('CAGEE/global_figures/n_gamma/Z/Percent of genes per sigma category low chromosome_name filter label.png')
+
+### graph autosomes vs Z
+ngamma_low_median_10_pos.table.stat %>%
+  dplyr::select(gamma.cat.value,
+                Percent.cat,
+                Chr,
+                SE.cat) %>% 
+  ggplot(aes(x = gamma.cat.value,
+             y = Percent.cat,
+             color = Chr)) +
+  geom_errorbar(aes( ymin = Percent.cat - SE.cat,
+                     ymax = Percent.cat + SE.cat)) +
+  geom_line() +
+  geom_point() +
+  theme_classic() +
+  scale_color_manual(values = c('black',
+                                'red'))+
+  xlab('Sigma category') +
+  ggtitle('Percent of genes per sigma category, standard error')
+ggsave('CAGEE/global_figures/n_gamma/Z/Percent of genes per sigma category low chromosome_name filter Autosomes.png')
 
 ### statistics
 ## one sample two tailed t test
@@ -5517,40 +5705,6 @@ ngamma_low_median_10_stat = ngamma_low_median_10_stat %>%
                                 n = length(unique(ngamma_low_median_10_pos.table.stat$gamma.cat.value))))
  
 ## add significance to graph
-# ngamma_low_median_10_pos.table.stat %>%
-#   dplyr::select(gamma.cat.value,
-#                 Percent.cat,
-#                 Chr,
-#                 SE.cat) %>% 
-#   ggplot(aes(x = gamma.cat.value,
-#              y = Percent.cat,
-#              color = Chr)) +
-#   geom_errorbar(aes( ymin = Percent.cat - SE.cat,
-#                      ymax = Percent.cat + SE.cat)) +
-#   geom_text(data = ngamma_low_median_10_stat %>% 
-#                mutate(sig = case_when(p.value.adj <= 0.001 ~ '***',
-#                                       p.value.adj > 0.001 & p.value.adj <= 0.01 ~ '**',
-#                                       p.value.adj > 0.01 & p.value.adj <= 0.05 ~ '*',
-#                                    TRUE ~ NA),
-#                       Percent = case_when(auto.percent.mean >= z.percent ~ auto.percent.mean,
-#                                           auto.percent.mean < z.percent ~ z.percent)),
-#              aes(x = gamma.cat.value,
-#                  y = Percent + 0.9,
-#                  label = sig),
-#              color = 'black',
-#             size = 5) + 
-#   geom_line() +
-#   geom_point() +
-#   theme_classic() +
-#   scale_color_manual(values = c('black',
-#                                 'red'))+
-#   labs(x = 'Median gamma category',
-#        y = 'Percent of genes',
-#        caption = 'FDR < *0.05, **0.01, ***0.001') + 
-#   ggtitle('Percent of genes per sigma category, standard error')
-# ggsave('CAGEE/global_figures/n_gamma/Z/Percent of genes per sigma category low chromosome_name filter Autosomes sig.png')
-
-# paper
 ngamma_low_median_10_pos.table.stat %>%
   dplyr::select(gamma.cat.value,
                 Percent.cat,
@@ -5560,35 +5714,31 @@ ngamma_low_median_10_pos.table.stat %>%
              y = Percent.cat,
              color = Chr)) +
   geom_errorbar(aes( ymin = Percent.cat - SE.cat,
-                     ymax = Percent.cat + SE.cat),
-                size = 0.15) +
+                     ymax = Percent.cat + SE.cat)) +
   geom_text(data = ngamma_low_median_10_stat %>% 
-              mutate(sig = case_when(p.value.adj <= 0.001 ~ '***',
-                                     p.value.adj > 0.001 & p.value.adj <= 0.01 ~ '**',
-                                     p.value.adj > 0.01 & p.value.adj <= 0.05 ~ '*',
-                                     TRUE ~ NA),
-                     Percent = case_when(auto.percent.mean >= z.percent ~ auto.percent.mean,
-                                         auto.percent.mean < z.percent ~ z.percent)),
-            aes(x = gamma.cat.value,
-                y = Percent + 0.9,
-                label = sig),
-            color = 'black',
-            size = 2) + 
+               mutate(sig = case_when(p.value.adj <= 0.001 ~ '***',
+                                      p.value.adj > 0.001 & p.value.adj <= 0.01 ~ '**',
+                                      p.value.adj > 0.01 & p.value.adj <= 0.05 ~ '*',
+                                   TRUE ~ NA),
+                      Percent = case_when(auto.percent.mean >= z.percent ~ auto.percent.mean,
+                                          auto.percent.mean < z.percent ~ z.percent)),
+             aes(x = gamma.cat.value,
+                 y = Percent + 0.9,
+                 label = sig),
+             color = 'black',
+            size = 5) + 
   geom_line() +
-  geom_point(size = 0.75) +
-  theme_classic(base_size = 8) +
+  geom_point() +
+  theme_classic() +
   scale_color_manual(values = c('black',
                                 'red'))+
   labs(x = 'Median gamma category',
        y = 'Percent of genes',
-       # caption = 'FDR < *0.05, **0.01, ***0.001'
-  ) +
-  theme(legend.position = 'null')
-ggsave('CAGEE/global_figures/n_gamma/Z/Percent of genes per sigma category low chromosome_name filter Autosomes sig.pdf',
-       height = 1.34,
-       width = 3.1,
-       units = 'in',
-       dpi = 320)
+       caption = 'FDR < *0.05, **0.01, ***0.001') + 
+  ggtitle('Percent of genes per sigma category, standard error')
+ggsave('CAGEE/global_figures/n_gamma/Z/Percent of genes per sigma category low chromosome_name filter Autosomes sig.png')
+
+
 #### ratio 
 ## ratio
 # 10 categories 
@@ -5667,112 +5817,112 @@ ngamma_low_ratio_10_pos.table.stat = ngamma_low_ratio_10_pos.table %>%
   mutate(gamma.cat.value = gamma.cat*ngamma_low_ratio_10.sigma)
 
 #### graph n_gamma_cats data low position
-# ### graph genes per category per chromsoome
-# ngamma_low_ratio_10_pos.table %>% 
-#   mutate(Chr = ifelse(chromosome_name == 'Z',
-#                       'Z',
-#                       'Auto')) %>% 
-#   ggplot(aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
-#              y = percent,
-#              group = chromosome_name,
-#              color = Chr)) +
-#   geom_line() +
-#   geom_point() +
-#   theme_classic() +
-#   scale_color_manual(values = c('black',
-#                                 'red')) +
-#   xlab('Sigma category') +
-#   ggtitle('Sex ratio')
-# ggsave('CAGEE/global_figures/n_gamma/Z/ratio Percent of genes per sigma category low chromosome_name.png')
-# 
-# ## filter for chrosmomes with genes > 150
-# ngamma_low_ratio_10_pos.table %>% 
-#   mutate(Chr = ifelse(chromosome_name == 'Z',
-#                       'Z',
-#                       'Auto')) %>% 
-#   filter(total > 150) %>% 
-#   ggplot(aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
-#              y = percent,
-#              group = chromosome_name,
-#              color = Chr)) +
-#   geom_line() +
-#   geom_point() +
-#   theme_classic() +
-#   scale_color_manual(values = c('black',
-#                                 'red'))+
-#   xlab('Sigma category')+
-#   ggtitle('Sex ratio')
-# ggsave('CAGEE/global_figures/n_gamma/Z/ratio Percent of genes per sigma category low chromosome_name filter.png')
-# 
-# ## add label
-# ngamma_low_ratio_10_pos.table %>% 
-#   mutate(Chr = ifelse(chromosome_name == 'Z',
-#                       'Z',
-#                       'Auto')) %>% 
-#   filter(total > 150) %>% 
-#   mutate(label = ifelse(gamma.cat == max(ngamma_low_ratio_10_pos.table$gamma.cat),
-#                         as.character(chromosome_name),
-#                         NA)) %>% 
-#   ggplot(aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
-#              y = percent,
-#              group = chromosome_name,
-#              color = Chr)) +
-#   geom_line() +
-#   geom_point() +
-#   ggrepel::geom_label_repel(aes(label = label),
-#                             max.overlaps = 50,
-#                             color = 'orange') +
-#   theme_classic() +
-#   scale_color_manual(values = c('black',
-#                                 'red'))+
-#   xlab('Sigma category') +
-#   ggtitle('Sex ratio')
-# ggsave('CAGEE/global_figures/n_gamma/Z/ratio Percent of genes per sigma category low chromosome_name filter label.png')
-# 
-# ### graph autosomes vs Z
-# # no Z
-# ngamma_low_ratio_10_pos.table %>% 
-#   mutate(Chr = ifelse(chromosome_name == 'Z',
-#                       'Z',
-#                       'Auto')) %>% 
-#   filter(total > 150) %>% 
-#   group_by(gamma.cat,
-#            Chr) %>% 
-#   summarise(Percent = mean(percent),
-#             SE = sd(percent)/sqrt(length((percent)))) %>% 
-#   ggplot(aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
-#              y = Percent,
-#              color = Chr)) +
-#   geom_errorbar(aes( ymin = Percent - SE,
-#                      ymax = Percent + SE)) +
-#   geom_line() +
-#   geom_point() +
-#   theme_classic() +
-#   scale_color_manual(values = c('black',
-#                                 'white'))+
-#   xlab('Sigma category') +
-#   ggtitle('Sex ratio percent of genes per sigma category, standard error')
-# ggsave('CAGEE/global_figures/n_gamma/Z/ratio Percent of genes per sigma category low chromosome_name filter Autosomes no z.png')
-# 
-# # with Z
-# ngamma_low_ratio_10_pos.table.stat %>%
-#   dplyr::select(gamma.cat.value,
-#                 Percent.cat,
-#                 Chr,
-#                 SE.cat) %>% 
-#   ggplot(aes(x = gamma.cat.value,
-#              y = Percent.cat,
-#              color = Chr)) +
-#   geom_errorbar(aes( ymin = Percent.cat - SE.cat,
-#                      ymax = Percent.cat + SE.cat)) +
-#   geom_line() +
-#   geom_point() +
-#   theme_classic() +
-#   scale_color_manual(values = c('black',
-#                                 'red'))+
-#   xlab('Sigma category') +
-#   ggtitle('Sex ratio percent of genes per sigma category, standard error')
-# ggsave('CAGEE/global_figures/n_gamma/Z/ratio Percent of genes per sigma category low chromosome_name filter Autosomes.png')
+### graph genes per category per chromsoome
+ngamma_low_ratio_10_pos.table %>% 
+  mutate(Chr = ifelse(chromosome_name == 'Z',
+                      'Z',
+                      'Auto')) %>% 
+  ggplot(aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
+             y = percent,
+             group = chromosome_name,
+             color = Chr)) +
+  geom_line() +
+  geom_point() +
+  theme_classic() +
+  scale_color_manual(values = c('black',
+                                'red')) +
+  xlab('Sigma category') +
+  ggtitle('Sex ratio')
+ggsave('CAGEE/global_figures/n_gamma/Z/ratio Percent of genes per sigma category low chromosome_name.png')
+
+## filter for chrosmomes with genes > 150
+ngamma_low_ratio_10_pos.table %>% 
+  mutate(Chr = ifelse(chromosome_name == 'Z',
+                      'Z',
+                      'Auto')) %>% 
+  filter(total > 150) %>% 
+  ggplot(aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
+             y = percent,
+             group = chromosome_name,
+             color = Chr)) +
+  geom_line() +
+  geom_point() +
+  theme_classic() +
+  scale_color_manual(values = c('black',
+                                'red'))+
+  xlab('Sigma category')+
+  ggtitle('Sex ratio')
+ggsave('CAGEE/global_figures/n_gamma/Z/ratio Percent of genes per sigma category low chromosome_name filter.png')
+
+## add label
+ngamma_low_ratio_10_pos.table %>% 
+  mutate(Chr = ifelse(chromosome_name == 'Z',
+                      'Z',
+                      'Auto')) %>% 
+  filter(total > 150) %>% 
+  mutate(label = ifelse(gamma.cat == max(ngamma_low_ratio_10_pos.table$gamma.cat),
+                        as.character(chromosome_name),
+                        NA)) %>% 
+  ggplot(aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
+             y = percent,
+             group = chromosome_name,
+             color = Chr)) +
+  geom_line() +
+  geom_point() +
+  ggrepel::geom_label_repel(aes(label = label),
+                            max.overlaps = 50,
+                            color = 'orange') +
+  theme_classic() +
+  scale_color_manual(values = c('black',
+                                'red'))+
+  xlab('Sigma category') +
+  ggtitle('Sex ratio')
+ggsave('CAGEE/global_figures/n_gamma/Z/ratio Percent of genes per sigma category low chromosome_name filter label.png')
+
+### graph autosomes vs Z
+# no Z
+ngamma_low_ratio_10_pos.table %>% 
+  mutate(Chr = ifelse(chromosome_name == 'Z',
+                      'Z',
+                      'Auto')) %>% 
+  filter(total > 150) %>% 
+  group_by(gamma.cat,
+           Chr) %>% 
+  summarise(Percent = mean(percent),
+            SE = sd(percent)/sqrt(length((percent)))) %>% 
+  ggplot(aes(x = gamma.cat*ngamma_low_ratio_10.sigma,
+             y = Percent,
+             color = Chr)) +
+  geom_errorbar(aes( ymin = Percent - SE,
+                     ymax = Percent + SE)) +
+  geom_line() +
+  geom_point() +
+  theme_classic() +
+  scale_color_manual(values = c('black',
+                                'white'))+
+  xlab('Sigma category') +
+  ggtitle('Sex ratio percent of genes per sigma category, standard error')
+ggsave('CAGEE/global_figures/n_gamma/Z/ratio Percent of genes per sigma category low chromosome_name filter Autosomes no z.png')
+
+# with Z
+ngamma_low_ratio_10_pos.table.stat %>%
+  dplyr::select(gamma.cat.value,
+                Percent.cat,
+                Chr,
+                SE.cat) %>% 
+  ggplot(aes(x = gamma.cat.value,
+             y = Percent.cat,
+             color = Chr)) +
+  geom_errorbar(aes( ymin = Percent.cat - SE.cat,
+                     ymax = Percent.cat + SE.cat)) +
+  geom_line() +
+  geom_point() +
+  theme_classic() +
+  scale_color_manual(values = c('black',
+                                'red'))+
+  xlab('Sigma category') +
+  ggtitle('Sex ratio percent of genes per sigma category, standard error')
+ggsave('CAGEE/global_figures/n_gamma/Z/ratio Percent of genes per sigma category low chromosome_name filter Autosomes.png')
 
 ### statistics
 ## one sample two tailed t test
@@ -5826,40 +5976,6 @@ ngamma_low_ratio_10_stat = ngamma_low_ratio_10_stat %>%
                                 n = length(unique(ngamma_low_ratio_10_pos.table.stat$gamma.cat.value))))
 
 ## add significance to graph
-# ngamma_low_ratio_10_pos.table.stat %>%
-#   dplyr::select(gamma.cat.value,
-#                 Percent.cat,
-#                 Chr,
-#                 SE.cat) %>% 
-#   ggplot(aes(x = gamma.cat.value,
-#              y = Percent.cat,
-#              color = Chr)) +
-#   geom_errorbar(aes( ymin = Percent.cat - SE.cat,
-#                      ymax = Percent.cat + SE.cat)) +
-#   geom_text(data = ngamma_low_ratio_10_stat %>% 
-#               mutate(sig = case_when(p.value.adj <= 0.001 ~ '***',
-#                                      p.value.adj > 0.001 & p.value.adj <= 0.01 ~ '**',
-#                                      p.value.adj > 0.01 & p.value.adj <= 0.05 ~ '*',
-#                                      TRUE ~ NA),
-#                      Percent = case_when(auto.percent.mean >= z.percent ~ auto.percent.mean,
-#                                          auto.percent.mean < z.percent ~ z.percent)),
-#             aes(x = gamma.cat.value,
-#                 y = Percent + 1.1,
-#                 label = sig),
-#             color = 'black',
-#             size = 5) + 
-#   geom_line() +
-#   geom_point() +
-#   theme_classic() +
-#   scale_color_manual(values = c('black',
-#                                 'red'))+
-#   labs(x = 'Ratio gamma category',
-#        y = 'Percent of genes',
-#        caption = 'FDR < *0.05, **0.01, ***0.001') + 
-#   ggtitle('Sex ratio percent of genes per sigma category, standard error')
-# ggsave('CAGEE/global_figures/n_gamma/Z/ratio Percent of genes per sigma category low chromosome_name filter Autosomes sig.png')
-
-# paper
 ngamma_low_ratio_10_pos.table.stat %>%
   dplyr::select(gamma.cat.value,
                 Percent.cat,
@@ -5869,8 +5985,7 @@ ngamma_low_ratio_10_pos.table.stat %>%
              y = Percent.cat,
              color = Chr)) +
   geom_errorbar(aes( ymin = Percent.cat - SE.cat,
-                     ymax = Percent.cat + SE.cat),
-                size = 0.15) +
+                     ymax = Percent.cat + SE.cat)) +
   geom_text(data = ngamma_low_ratio_10_stat %>% 
               mutate(sig = case_when(p.value.adj <= 0.001 ~ '***',
                                      p.value.adj > 0.001 & p.value.adj <= 0.01 ~ '**',
@@ -5882,22 +5997,17 @@ ngamma_low_ratio_10_pos.table.stat %>%
                 y = Percent + 1.1,
                 label = sig),
             color = 'black',
-            size = 2) + 
+            size = 5) + 
   geom_line() +
-  geom_point(size = 0.75) +
-  theme_classic(base_size = 8) +
+  geom_point() +
+  theme_classic() +
   scale_color_manual(values = c('black',
                                 'red'))+
   labs(x = 'Ratio gamma category',
        y = 'Percent of genes',
-       # caption = 'FDR < *0.05, **0.01, ***0.001'
-       ) +
-  theme(legend.position = 'null')
-ggsave('CAGEE/global_figures/n_gamma/Z/ratio Percent of genes per sigma category low chromosome_name filter Autosomes sig.pdf',
-       height = 1.34,
-       width = 3.1,
-       units = 'in',
-       dpi = 320)
+       caption = 'FDR < *0.05, **0.01, ***0.001') + 
+  ggtitle('Sex ratio percent of genes per sigma category, standard error')
+ggsave('CAGEE/global_figures/n_gamma/Z/ratio Percent of genes per sigma category low chromosome_name filter Autosomes sig.png')
 
 
 #### save stat results together
@@ -5920,14 +6030,6 @@ ngamma_low_df = ngamma_low_ratio_10 %>%
                             gamma.cat) %>% 
               mutate(gamma.cat.median = gamma.cat*ngamma_low_median_10.sigma) %>% 
               dplyr::select(-gamma.cat))
-
-## save for supplemental
-# rename variables
-write.csv(ngamma_low_df %>% 
-            dplyr::rename('median_sigma' = 'gamma.cat.median')%>% 
-            dplyr::rename('M:F_sigma' = 'gamma.cat.ratio'),
-          'CAGEE/global_figures/n_gamma/compare/Dataset_S3.csv',
-          row.names = F)
 
 ## stats
 ngamma_low_df_sum = ngamma_low_df %>% 
@@ -5971,51 +6073,323 @@ ngamma_low_df_sum = ngamma_low_df_sum %>%
   
 ### graph
 ## heatmap
-# ngamma_low_df_sum %>% 
-#   ggplot(aes(y = as.numeric(as.character(gamma.cat.ratio)),
-#              x = as.numeric(as.character(gamma.cat.median)),
-#              label = sig,
-#              fill = Freq)) +
-#   geom_tile(color = 'darkgrey') +
-#   geom_text(size = 2) +
-#   labs(x = 'Median gamma category',
-#        y = 'Ratio gamma category',
-#        caption = 'FDR < *0.05, **0.01, ***0.001') +
-#   scale_fill_gradient2(low = 'white',
-#                        high = 'red',
-#                        limits = c(0,400)) + 
-#   theme_classic() +
-#   coord_fixed(ratio = 0.05/0.002)
-# ggsave('CAGEE/global_figures/n_gamma/compare/heatmap median vs ratio sigma cat.png')
-
-# paper
 ngamma_low_df_sum %>% 
   ggplot(aes(y = as.numeric(as.character(gamma.cat.ratio)),
              x = as.numeric(as.character(gamma.cat.median)),
              label = sig,
              fill = Freq)) +
-  geom_tile(color = 'black') +
-  geom_text(size = 1,
-            vjust = 0.75) +
+  geom_tile(color = 'darkgrey') +
+  geom_text(size = 2) +
   labs(x = 'Median gamma category',
        y = 'Ratio gamma category',
-       # caption = 'FDR < *0.05, **0.01, ***0.001'
-       ) +
+       caption = 'FDR < *0.05, **0.01, ***0.001') +
   scale_fill_gradient2(low = 'white',
                        high = 'red',
                        limits = c(0,400)) + 
-  theme_classic(base_size = 8) +
-  coord_fixed(ratio = 0.05/0.002) + 
-  theme(legend.key.size = unit(0.075,
-                               "in"))
-  # theme(legend.key.height = unit(0.3, "in"),
-  #   legend.key.width = unit(0.5, "in"))
-ggsave('CAGEE/global_figures/n_gamma/compare/heatmap median vs ratio sigma cat.pdf',
-       height = 2.6895,
-       width = 3.25,
-       units = 'in',
-       dpi = 320)
+  theme_classic() +
+  coord_fixed(ratio = 0.05/0.002)
+ggsave('CAGEE/global_figures/n_gamma/compare/heatmap median vs ratio sigma cat.png')
 
+### compare if low expressing Z genes are at a higher rate than autosomal
+## get median species expression
+data.wide.format.median.sp = read_delim('CAGEE/data/normalizedCounts_median.tsv',
+                                     delim = '\t')
+
+# create long format
+data.format.median.sp.avg = data.wide.format.median.sp %>% 
+  dplyr::select(-c(GeneDescription)) %>% 
+  pivot_longer(cols = -c(GeneName),
+               names_to = 'Species',
+               values_to = 'Median') %>% 
+  mutate(log.Median = log1p(Median)) %>% 
+  group_by(GeneName) %>% 
+  summarise(mean.log.Median = mean(log.Median, na.rm=T)) %>% 
+  left_join(ngamma_low_df,
+            by = c('GeneName' = 'transcript')) %>% 
+  left_join(data.gene.chromosome %>% 
+              dplyr::select(Symbol,
+                            chromosome_name),
+            by = c('GeneName' = 'Symbol')) %>% 
+  filter(!(is.na(chromosome_name))) %>% 
+  filter(chromosome_name %in% c('Z', 4)) %>% 
+  mutate(chromosome_name = ifelse(chromosome_name == 'Z',
+                                  'Z',
+                                  'A'))
+
+# stat
+# t-test to compare if low expressing genes have higher sigma in Z vs A
+# bottom 50% 
+t.test(gamma.cat.median ~ chromosome_name,
+       data= data.format.median.sp.avg %>%
+         group_by(chromosome_name) %>% 
+         filter(mean.log.Median <= quantile(mean.log.Median, 0.5)) %>% 
+         ungroup())
+
+# top 50% 
+t.test(gamma.cat.median ~ chromosome_name,
+       data= data.format.median.sp.avg %>%
+         group_by(chromosome_name) %>% 
+         filter(mean.log.Median >= quantile(mean.log.Median, 0.5)) %>% 
+         ungroup())
+
+# bottom 50% 
+t.test(gamma.cat.ratio ~ chromosome_name,
+       data= data.format.median.sp.avg %>%
+         group_by(chromosome_name) %>% 
+         filter(mean.log.Median <= quantile(mean.log.Median, 0.5)) %>% 
+         ungroup())
+
+# top 50% 
+t.test(gamma.cat.ratio ~ chromosome_name,
+       data= data.format.median.sp.avg %>%
+         group_by(chromosome_name) %>% 
+         filter(mean.log.Median >= quantile(mean.log.Median, 0.5)) %>% 
+         ungroup())
+
+# get mean 
+data.format.median.sp.avg %>%
+  group_by(chromosome_name) %>% 
+  summarise(mean = mean(mean.log.Median))
+
+# below mean
+t.test(gamma.cat.median ~ chromosome_name,
+       data= data.format.median.sp.avg %>% 
+         mutate(keep = case_when(chromosome_name == 'Z' & mean.log.Median < 5.07 ~ 1,
+                                 chromosome_name == 'A' & mean.log.Median < 5.33 ~ 1,
+                                 TRUE ~ 0)) %>% 
+         filter(keep == 1))
+
+# above mean
+t.test(gamma.cat.median ~ chromosome_name,
+       data= data.format.median.sp.avg %>% 
+         mutate(keep = case_when(chromosome_name == 'Z' & mean.log.Median > 5.07 ~ 1,
+                                 chromosome_name == 'A' & mean.log.Median > 5.33 ~ 1,
+                                 TRUE ~ 0)) %>% 
+         filter(keep == 1))
+
+# below mean
+t.test(gamma.cat.ratio ~ chromosome_name,
+       data= data.format.median.sp.avg %>% 
+         mutate(keep = case_when(chromosome_name == 'Z' & mean.log.Median < 5.07 ~ 1,
+                                 chromosome_name == 'A' & mean.log.Median < 5.33 ~ 1,
+                                 TRUE ~ 0)) %>% 
+         filter(keep == 1))
+
+# above mean 
+t.test(gamma.cat.ratio ~ chromosome_name,
+       data= data.format.median.sp.avg %>% 
+         mutate(keep = case_when(chromosome_name == 'Z' & mean.log.Median > 5.07 ~ 1,
+                                 chromosome_name == 'A' & mean.log.Median > 5.33 ~ 1,
+                                 TRUE ~ 0)) %>% 
+         filter(keep == 1))
+
+
+### graph expression values across species 
+## divide genes into groups of low/high ratio or median rate
+ngamma_low_df_groups = ngamma_low_df %>% 
+  mutate(group.gamma.cat.ratio = case_when(gamma.cat.ratio == min(gamma.cat.ratio) ~ 'low.ratio',
+                                           gamma.cat.ratio == max(gamma.cat.ratio) ~ 'high.ratio',
+                                           TRUE ~ 'Other'),
+         group.gamma.cat.median = case_when(gamma.cat.median == min(gamma.cat.median) ~ 'low.median',
+                                            gamma.cat.median == max(gamma.cat.median) ~ 'high.median',
+                                           TRUE ~ 'Other'),
+         gamma.group = paste0(group.gamma.cat.ratio,
+                              ':',
+                              group.gamma.cat.median)) %>% 
+  dplyr::select(c(transcript,
+                  gamma.group)) 
+
+## get median species per sex expression
+data.wide.format.median = read_delim('CAGEE/data/normalizedCounts_median_sex.tsv',
+                                     delim = '\t')
+
+# create long format
+data.median.sex = data.wide.format.median %>% 
+  dplyr::select(-c(GeneDescription)) %>% 
+  pivot_longer(cols = -c(GeneName,
+                         SAMPLETYPE),
+               names_to = 'Species',
+               values_to = 'Median') %>% 
+  mutate(log.Median = log1p(Median)) %>% 
+  left_join(ngamma_low_df_groups,
+            by = c('GeneName' = 'transcript')) 
+
+# get ratio data
+# ratio
+data.wide.format = read_delim('CAGEE/data/normalizedCounts_ratio.tsv',
+            delim = '\t')
+
+# create long format
+data.ratio = data.wide.format %>% 
+  dplyr::select(-c(GeneDescription)) %>% 
+  pivot_longer(cols = -c(GeneName),
+               names_to = 'Species',
+               values_to = 'Ratio') %>% 
+  mutate(log.ratio = log(Ratio)) 
+
+# pick median gene per category as example
+# remove low expressing genes 
+data.median.sex.avg.gene =  data.median.sex %>% 
+  mutate(log.Median = ifelse(log.Median < log1p(2),
+                             NA,
+                             log.Median)) %>% 
+  group_by(gamma.group) %>% 
+  mutate(median = quantile(log.Median,
+                           probs = 0.500001, 
+                           type = 1, 
+                           names = FALSE,
+                           na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(keep = ifelse(median*0.9 < log.Median & median*1.25 > log.Median,
+                       1,
+                       0)) %>% 
+  group_by(GeneName) %>% 
+  mutate(sum = sum(keep,na.rm = T),
+         sd.gene = sd(log.Median,
+                                na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(log.Median = ifelse(is.na(log.Median),
+                             0,
+                             log.Median))
+
+# add ratio data
+data.median.sex.avg.gene = data.median.sex.avg.gene %>% 
+  left_join(data.ratio) %>% 
+  group_by(gamma.group) %>% 
+  mutate(log.ratio.top = quantile(log.ratio,
+                           probs = 0.9,
+                           na.rm = TRUE),
+         log.ratio.bottom = quantile(log.ratio,
+                                  probs = 0.1,
+                                  na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(keep.ratio = ifelse(log.ratio < log.ratio.bottom | log.ratio > log.ratio.top,
+                             1,
+                             0)) %>% 
+  group_by(GeneName) %>% 
+  mutate(sum.ratio = sum(keep.ratio, na.rm = T)) %>% 
+  ungroup()
+
+# add chromsome information
+data.median.sex.avg.gene = data.median.sex.avg.gene %>% 
+  left_join(data.gene.chromosome %>% 
+              dplyr::select(Symbol,
+                            chromosome_name),
+              by = c('GeneName' = 'Symbol')) %>% 
+  filter(!(is.na(chromosome_name))) %>% 
+  # mutate(chromosome_name = ifelse(chromosome_name == 'Z',
+  #                                 'Z',
+  #                                 'A'))
+  filter(chromosome_name != 'Z') 
+  
+# mark interesting genes
+data.median.sex.avg.gene.filter = data.median.sex.avg.gene %>% 
+  # filter(sum < 20) %>% 
+  droplevels() %>% 
+  group_by(gamma.group) %>% 
+  mutate(score = case_when(gamma.group == "low.ratio:low.median" & sum > 10 & sum < 20 ~
+                           rank(sd.gene) +
+                           rank(sum.ratio),
+                           gamma.group == "low.ratio:high.median" & sum > 1 & sum < 10  ~
+                             rank(-sd.gene) +
+                             rank(sum.ratio),
+                           gamma.group == "high.ratio:low.median" & sum > 10 & sum < 20 ~
+                             rank(sd.gene) +
+                             rank(-sum.ratio),
+                           gamma.group == "high.ratio:high.median"~
+                             rank(-sd.gene) +
+                             rank(-sum.ratio),
+                           TRUE ~ NA)) %>%
+slice_min(score, n = 1)
+  
+
+## graph genes across sex
+data.median.sex.avg.gene.filter %>% 
+  filter(gamma.group %in% c('low.ratio:low.median',
+                            'low.ratio:high.median',
+                            'high.ratio:low.median',
+                            'high.ratio:high.median')) %>% 
+  mutate(Sex = SAMPLETYPE,
+         Species_level = fct_relevel(Species, 
+                                     c("BS", 
+                                       "TS", 
+                                       "CW",
+                                       'HW',
+                                       'RO',
+                                       'BB',
+                                       'YW',
+                                       'PW',
+                                       'HS',
+                                       'ET'))) %>% 
+  arrange(Species_level) %>% 
+  ggplot(aes(x = log.Median,
+             y = Species_level,
+             color = Sex,
+             group = Sex)) +
+  geom_path() +
+  geom_point() +
+  theme_classic() +
+  theme(panel.spacing = unit(0.1, 
+                         "lines"),
+        panel.border = element_rect(color = "black", 
+                                fill = NA,
+                                linewidth = 0.8),
+        legend.position = 'inside',
+        legend.position.inside = c(0.95,0.5),
+        legend.background = element_blank(), 
+        legend.key = element_blank() )+
+  scale_color_manual(values = c('F' = 'grey66',
+                                'M' = 'black')) +
+  xlab('Median expression (ln)') +
+  ylab('Species')  +
+  facet_grid(.~gamma.group) + 
+  theme(strip.text = element_text(color = 'transparent'))
+ggsave('CAGEE/global_figures/n_gamma/compare/Example genes of high and low sigma log.pdf',
+       height = 5.4,
+       width = 6.4,
+       units = 'in',
+       dpi = 720)
+
+# median expression
+data.median.sex.avg.gene.filter %>% 
+  filter(gamma.group %in% c('low.ratio:low.median',
+                            'low.ratio:high.median',
+                            'high.ratio:low.median',
+                            'high.ratio:high.median')) %>% 
+  mutate(Sex = SAMPLETYPE,
+         Species_level = fct_relevel(Species, 
+                                     c("BS", 
+                                       "TS", 
+                                       "CW",
+                                       'HW',
+                                       'RO',
+                                       'BB',
+                                       'YW',
+                                       'PW',
+                                       'HS',
+                                       'ET'))) %>% 
+  arrange(Species_level) %>%
+  ggplot(aes(x = Median,
+             y = Species_level,
+             color = Sex,
+             group = Sex)) +
+  geom_path() +
+  geom_point() +
+  theme_classic() +
+  theme(panel.spacing = unit(0.1, 
+                             "lines"),
+        panel.border = element_rect(color = "black", 
+                                    fill = NA,
+                                    linewidth = 0.8))+
+  scale_color_manual(values = c('F' = 'grey66',
+                                'M' = 'black')) +
+  xlab('Median expression') +
+  ylab('Species')  +
+  facet_grid(.~gamma.group,
+             scales = 'free_x')
+ggsave('CAGEE/global_figures/n_gamma/compare/Example genes of high and low sigma.pdf',
+       height = 10,
+       width = 10)
 
 #### set up GO terms  genes ####
 #### all genes
@@ -7677,32 +8051,26 @@ ggplot(zg.df,
            y=density)) + 
   geom_area(aes(x=x,
                 y=density,
-                # group=qt1,
-                # fill=qt1
-                ),
+                group=qt1,
+                fill=qt1),
             color="black", 
             fill = 'darkgrey')+
   theme_classic() +
-  geom_point(aes(y = 0.011,
+  geom_point(aes(y = 0.0075,
                  x = (zg.df %>% 
                    filter(qt1 == 1) %>% 
                    pull(x) %>% 
                    median())),
-             size = 1,
+             size = 3,
              shape = 25,
              fill = 'black')  +
   scale_x_continuous(expand = c(0, 0)) +
   scale_y_continuous(expand = c(0, 0)) +
   xlab('sigma') +
-  xlim(0,0.05)+
-  ylim(0,0.19) +
-  theme_classic(base_size = 8)+
-  theme(axis.text = element_text(colour = "black"))
-ggsave('CAGEE/global_figures/n_gamma/example_presentation/k1 distribution color mean gamma.pdf',
-       width = 2.2,
-       height = 1.2,
-       units = 'in',
-       dpi = 300)
+  xlim(0,0.05)
+ggsave('CAGEE/global_figures/n_gamma/example_presentation/k1 distribution color mean gamma.png',
+       width = 4.5,
+       height = 2.6)
 
 
 ## k = 10
@@ -7712,8 +8080,7 @@ ggplot(zg.df,aes(x=x,y=density)) +
   geom_area(aes(x=x,
                 y=density,
                 ),
-            fill = 'darkgrey',
-            color = 'black'
+            fill = 'darkgrey'
             )+
   theme_classic() +
   geom_segment(aes(y = 0,
@@ -7724,8 +8091,7 @@ ggplot(zg.df,aes(x=x,y=density)) +
                    x = zg.df %>% 
                      filter(qt10 == 1) %>% 
                      filter(x == max(x)) %>% 
-                     pull(x)),
-               linewidth = 0.25)+
+                     pull(x)))+
   geom_segment(aes(y = 0,
                    yend = zg.df %>% 
                      filter(qt10 == 2) %>% 
@@ -7734,7 +8100,7 @@ ggplot(zg.df,aes(x=x,y=density)) +
                    x = zg.df %>% 
                      filter(qt10 == 2) %>% 
                      filter(x == max(x)) %>% 
-                     pull(x)), linewidth = 0.25)+
+                     pull(x)))+
   geom_segment(aes(y = 0,
                    yend = zg.df %>% 
                      filter(qt10 == 3) %>% 
@@ -7743,7 +8109,7 @@ ggplot(zg.df,aes(x=x,y=density)) +
                    x = zg.df %>% 
                      filter(qt10 == 3) %>% 
                      filter(x == max(x)) %>% 
-                     pull(x)), linewidth = 0.25)+
+                     pull(x)))+
   geom_segment(aes(y = 0,
                    yend = zg.df %>% 
                      filter(qt10 == 4) %>% 
@@ -7752,7 +8118,7 @@ ggplot(zg.df,aes(x=x,y=density)) +
                    x = zg.df %>% 
                      filter(qt10 == 4) %>% 
                      filter(x == max(x)) %>% 
-                     pull(x)), linewidth = 0.25)+
+                     pull(x)))+
   geom_segment(aes(y = 0,
                    yend = zg.df %>% 
                      filter(qt10 == 5) %>% 
@@ -7761,7 +8127,7 @@ ggplot(zg.df,aes(x=x,y=density)) +
                    x = zg.df %>% 
                      filter(qt10 == 5) %>% 
                      filter(x == max(x)) %>% 
-                     pull(x)), linewidth = 0.25)+
+                     pull(x)))+
   geom_segment(aes(y = 0,
                    yend = zg.df %>% 
                      filter(qt10 == 6) %>% 
@@ -7770,7 +8136,7 @@ ggplot(zg.df,aes(x=x,y=density)) +
                    x = zg.df %>% 
                      filter(qt10 == 6) %>% 
                      filter(x == max(x)) %>% 
-                     pull(x)), linewidth = 0.25)+
+                     pull(x)))+
   geom_segment(aes(y = 0,
                    yend = zg.df %>% 
                      filter(qt10 == 7) %>% 
@@ -7779,7 +8145,7 @@ ggplot(zg.df,aes(x=x,y=density)) +
                    x = zg.df %>% 
                      filter(qt10 == 7) %>% 
                      filter(x == max(x)) %>% 
-                     pull(x)), linewidth = 0.25)+
+                     pull(x)))+
   geom_segment(aes(y = 0,
                    yend = zg.df %>% 
                      filter(qt10 == 8) %>% 
@@ -7788,7 +8154,7 @@ ggplot(zg.df,aes(x=x,y=density)) +
                    x = zg.df %>% 
                      filter(qt10 == 8) %>% 
                      filter(x == max(x)) %>% 
-                     pull(x)), linewidth = 0.25)+
+                     pull(x)))+
   geom_segment(aes(y = 0,
                    yend = zg.df %>% 
                      filter(qt10 == 9) %>% 
@@ -7797,7 +8163,7 @@ ggplot(zg.df,aes(x=x,y=density)) +
                    x = zg.df %>% 
                      filter(qt10 == 9) %>% 
                      filter(x == max(x)) %>% 
-                     pull(x)), linewidth = 0.25)+
+                     pull(x)))+
   geom_segment(aes(y = 0,
                    yend = zg.df %>% 
                      filter(qt10 == 10) %>% 
@@ -7806,99 +8172,95 @@ ggplot(zg.df,aes(x=x,y=density)) +
                    x = zg.df %>% 
                      filter(qt10 == 10) %>% 
                      filter(x == max(x)) %>% 
-                     pull(x)), linewidth = 0.25)+
-    geom_point(aes(y = 0.011,
+                     pull(x)))+
+    geom_point(aes(y = 0.0075,
                  x = zg.df %>% 
                    filter(qt10 == 1) %>% 
                    pull(x) %>% 
                    median()),
-             size = 1,
+             size = 3,
              shape = 25,
              fill = 'black') +
-  geom_point(aes(y = 0.011,
+  geom_point(aes(y = 0.0075,
                  x = zg.df %>% 
                    filter(qt10 == 2) %>% 
                    pull(x) %>% 
                    median()),
-             size = 1,
+             size = 3,
              shape = 25,
              fill = 'black') +
-  geom_point(aes(y = 0.011,
+  geom_point(aes(y = 0.0075,
                  x = zg.df %>% 
                    filter(qt10 == 3) %>% 
                    pull(x) %>% 
                    median()),
-             size = 1,
+             size = 3,
              shape = 25,
              fill = 'black') +
-  geom_point(aes(y = 0.011,
+  geom_point(aes(y = 0.0075,
                  x = zg.df %>% 
                    filter(qt10 == 4) %>% 
                    pull(x) %>% 
                    median()),
-             size = 1,
+             size = 3,
              shape = 25,
              fill = 'black') +
-  geom_point(aes(y = 0.011,
+  geom_point(aes(y = 0.0075,
                  x = zg.df %>% 
                    filter(qt10 == 5) %>% 
                    pull(x) %>% 
                    median()),
-             size = 1,
+             size = 3,
              shape = 25,
              fill = 'black') +
-  geom_point(aes(y = 0.011,
+  geom_point(aes(y = 0.0075,
                  x = zg.df %>% 
                    filter(qt10 == 6) %>% 
                    pull(x) %>% 
                    median()),
-             size = 1,
+             size = 3,
              shape = 25,
              fill = 'black') +
-  geom_point(aes(y = 0.011,
+  geom_point(aes(y = 0.0075,
                  x = zg.df %>% 
                    filter(qt10 == 7) %>% 
                    pull(x) %>% 
                    median()),
-             size = 1,
+             size = 3,
              shape = 25,
              fill = 'black') +
-  geom_point(aes(y = 0.011,
+  geom_point(aes(y = 0.0075,
                  x = zg.df %>% 
                    filter(qt10 == 8) %>% 
                    pull(x) %>% 
                    median()),
-             size = 1,
+             size = 3,
              shape = 25,
              fill = 'black') +
-  geom_point(aes(y = 0.011,
+  geom_point(aes(y = 0.0075,
                  x = zg.df %>% 
                    filter(qt10 == 9) %>% 
                    pull(x) %>% 
                    median()),
-             size = 1,
+             size = 3,
              shape = 25,
              fill = 'black') +
-  geom_point(aes(y = 0.011,
+  geom_point(aes(y = 0.0075,
                  x = zg.df %>% 
                    filter(qt10 == 10) %>% 
                    pull(x) %>% 
                    median()),
-             size = 1,
+             size = 3,
              shape = 25,
              fill = 'black') +
   scale_x_continuous(expand = c(0, 0)) +
   scale_y_continuous(expand = c(0, 0)) +
   xlab('sigma') +
-  xlim(0,0.05) +
-  ylim(0,0.19) +
-  theme_classic(base_size = 8)+
-  theme(axis.text = element_text(colour = "black"))
-ggsave('CAGEE/global_figures/n_gamma/example_presentation/k10 distribution color mean gamma.pdf',
-       width = 2.2,
-       height = 1.2,
-       units = 'in',
-       dpi = 720)
+  xlim(0,0.05)
+ggsave('CAGEE/global_figures/n_gamma/example_presentation/k10 distribution color mean gamma.png',
+       width = 4.5,
+       height = 2.6)
+
 
 
 #### Credible changes ratio ####
@@ -7951,7 +8313,7 @@ data.cagee.changes.ratio.direction.sig = data.cagee.changes.ratio.direction*data
 data.cagee.changes.ratio.sum = data.cagee.changes.ratio.sig %>% 
   rowSums() %>% 
   as.data.frame() %>% 
-  dplyr::rename(Num_credible_changes = '.') %>% 
+  rename(Num_credible_changes = '.') %>% 
   rownames_to_column('TranscriptID') %>% 
   full_join(data.cagee.changes.ratio.direction.sig %>% 
               as.data.frame() %>% 
@@ -7986,21 +8348,21 @@ data.cagee.changes.ratio.sum %>%
   nrow()
 
 ### graph number of changes
-# data.cagee.changes.ratio.sum %>% 
-#   group_by(Num_credible_changes) %>% 
-#   summarise(Total_credible_changes = n()) %>% 
-#   ggplot(aes(y = Total_credible_changes,
-#              x = as.factor(Num_credible_changes),
-#              label = Total_credible_changes)) +
-#   geom_vline(xintercept = 1.5,
-#              linetype = 'dashed') +
-#   geom_bar(stat = 'identity') +
-#   geom_text(vjust = -0.5) +
-#   theme_classic() +
-#   ggtitle("Number of genes with credible change in M:F across branches") +
-#   xlab('Number of branches') +
-#   ylab('Number of genes')
-# ggsave("CAGEE/global_figures/credible_change/ratio credible changes hist.png")
+data.cagee.changes.ratio.sum %>% 
+  group_by(Num_credible_changes) %>% 
+  summarise(Total_credible_changes = n()) %>% 
+  ggplot(aes(y = Total_credible_changes,
+             x = as.factor(Num_credible_changes),
+             label = Total_credible_changes)) +
+  geom_vline(xintercept = 1.5,
+             linetype = 'dashed') +
+  geom_bar(stat = 'identity') +
+  geom_text(vjust = -0.5) +
+  theme_classic() +
+  ggtitle("Number of genes with credible change in M:F across branches") +
+  xlab('Number of branches') +
+  ylab('Number of genes')
+ggsave("CAGEE/global_figures/credible_change/ratio credible changes hist.png")
 
 # graph concordance
 data.cagee.changes.ratio.sum %>% 
@@ -8029,41 +8391,6 @@ data.cagee.changes.ratio.sum %>%
                                'black',
                                'white'))
 ggsave("CAGEE/global_figures/credible_change/ratio credible changes concordance hist.png")
-
-# paper
-data.cagee.changes.ratio.sum %>% 
-  group_by(Num_credible_changes,
-           concordance) %>% 
-  summarise(Total_credible_changes = n()) %>% 
-  mutate(concordance = ifelse(Num_credible_changes <= 1,
-                              'NA',
-                              concordance)) %>% 
-  ggplot(aes(y = Total_credible_changes,
-             x = as.factor(Num_credible_changes),
-             label = Total_credible_changes,
-             fill = concordance)) +
-  geom_vline(xintercept = 1.5,
-             linetype = 'dashed') +
-  geom_bar(stat = 'identity',
-           position = 'dodge',
-           color = 'black') +
-  geom_text(vjust = -0.5,
-            position = position_dodge(width = 1)) +
-  # ggtitle("Number of genes with credible change in M:F across branches") +
-  xlab('Number of branches') +
-  ylab('Number of genes') +
-  scale_fill_manual(values = c('grey',
-                               'black',
-                               'white')) +
-  theme_classic(base_size = 8) +
-  theme(legend.position = 'inside',
-        legend.position.inside = c(0.90,
-                                   0.5))
-ggsave("CAGEE/global_figures/credible_change/ratio credible changes concordance hist.pdf",
-       height = 4,
-       width = 6.5,
-       dpi = 320,
-       units = 'in')
 
 
 
@@ -8223,7 +8550,7 @@ data.cagee.changes.median.direction.sig = data.cagee.changes.median.direction*da
 data.cagee.changes.median.sum = data.cagee.changes.median.sig %>% 
   rowSums() %>% 
   as.data.frame() %>% 
-  dplyr::rename(Num_credible_changes = '.') %>% 
+  rename(Num_credible_changes = '.') %>% 
   rownames_to_column('TranscriptID') %>% 
   full_join(data.cagee.changes.median.direction.sig %>% 
               as.data.frame() %>% 
@@ -8258,49 +8585,51 @@ data.cagee.changes.median.sum %>%
   nrow()
 
 ### graph number of changes
-# data.cagee.changes.median.sum %>% 
-#   group_by(Num_credible_changes) %>% 
-#   summarise(Total_credible_changes = n()) %>% 
-#   ggplot(aes(y = Total_credible_changes,
-#              x = as.factor(Num_credible_changes),
-#              label = Total_credible_changes)) +
-#   geom_vline(xintercept = 1.5,
-#              linetype = 'dashed') +
-#   geom_bar(stat = 'identity') +
-#   geom_text(vjust = -0.5) +
-#   theme_classic() +
-#   ggtitle("Number of genes with credible change in M:F across branches") +
-#   xlab('Number of branches') +
-#   ylab('Number of genes')
-# ggsave("CAGEE/global_figures/credible_change/median credible changes hist.png")
+data.cagee.changes.median.sum %>% 
+  group_by(Num_credible_changes) %>% 
+  summarise(Total_credible_changes = n()) %>% 
+  ggplot(aes(y = Total_credible_changes,
+             x = as.factor(Num_credible_changes),
+             label = Total_credible_changes)) +
+  geom_vline(xintercept = 1.5,
+             linetype = 'dashed') +
+  geom_bar(stat = 'identity') +
+  geom_text(vjust = -0.5) +
+  theme_classic() +
+  ggtitle("Number of genes with credible change in M:F across branches") +
+  xlab('Number of branches') +
+  ylab('Number of genes')
+ggsave("CAGEE/global_figures/credible_change/median credible changes hist.png")
 
 # graph concordance
-# data.cagee.changes.median.sum %>% 
-#   group_by(Num_credible_changes,
-#            concordance) %>% 
-#   summarise(Total_credible_changes = n()) %>% 
-#   mutate(concordance = ifelse(Num_credible_changes <= 1,
-#                               'NA',
-#                               concordance)) %>% 
-#   ggplot(aes(y = Total_credible_changes,
-#              x = as.factor(Num_credible_changes),
-#              label = Total_credible_changes,
-#              fill = concordance)) +
-#   geom_vline(xintercept = 1.5,
-#              linetype = 'dashed') +
-#   geom_bar(stat = 'identity',
-#            position = 'dodge',
-#            color = 'black') +
-#   geom_text(vjust = -0.5,
-#             position = position_dodge(width = 1)) +
-#   theme_classic() +
-#   ggtitle("Number of genes with credible change in M:F across branches") +
-#   xlab('Number of branches') +
-#   ylab('Number of genes') +
-#   scale_fill_manual(values = c('grey',
-#                                'black',
-#                                'white'))
-# ggsave("CAGEE/global_figures/credible_change/median credible changes concordance hist.png")
+data.cagee.changes.median.sum %>% 
+  group_by(Num_credible_changes,
+           concordance) %>% 
+  summarise(Total_credible_changes = n()) %>% 
+  mutate(concordance = ifelse(Num_credible_changes <= 1,
+                              'NA',
+                              concordance)) %>% 
+  ggplot(aes(y = Total_credible_changes,
+             x = as.factor(Num_credible_changes),
+             label = Total_credible_changes,
+             fill = concordance)) +
+  geom_vline(xintercept = 1.5,
+             linetype = 'dashed') +
+  geom_bar(stat = 'identity',
+           position = 'dodge',
+           color = 'black') +
+  geom_text(vjust = -0.5,
+            position = position_dodge(width = 1)) +
+  theme_classic() +
+  ggtitle("Number of genes with credible change in M:F across branches") +
+  xlab('Number of branches') +
+  ylab('Number of genes') +
+  scale_fill_manual(values = c('grey',
+                               'black',
+                               'white'))
+ggsave("CAGEE/global_figures/credible_change/median credible changes concordance hist.png")
+
+
 
 ## summarize across cavity and flexible nesting 
 # filter to external branches
